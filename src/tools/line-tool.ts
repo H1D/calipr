@@ -157,6 +157,12 @@ export class LineTool implements Tool {
       this.isHoldingForArc = false;
       this.isClosingSegment = false;
       this.activeMeasurement.closed = true;
+      // Remove explicit closing segment if straight (no arc bulge) —
+      // the renderer's implicit closing logic draws the line back to start
+      const lastSeg = this.activeMeasurement.segments[this.activeMeasurement.segments.length - 1];
+      if (lastSeg && !lastSeg.bulge) {
+        this.activeMeasurement.segments.pop();
+      }
       const completed = this.activeMeasurement;
       this.activeMeasurement = null;
       this.currentSnap = null;
