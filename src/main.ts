@@ -122,6 +122,16 @@ function draw() {
     const calTool = manager.activeTool as CalibrateTool;
     calTool.calButtons = calResult.buttons;
   } else {
+    // Alignment crosshair during creation or drag
+    const crosshairPos = manager.isDragging
+      ? manager.mousePos
+      : drawState.activeMeasurement
+        ? (drawState.effectiveMousePos ?? manager.mousePos)
+        : null;
+    if (crosshairPos) {
+      renderer.drawCrosshair(crosshairPos);
+    }
+
     // Draw completed measurements
     for (const m of manager.measurements) {
       const hIdx = manager.hoveredMeasurementId === m.id ? manager.hoveredPointIdx : null;

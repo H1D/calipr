@@ -1,0 +1,31 @@
+# ruler2 documentation index
+# Read this file first; drill into domain files for details.
+
+project: ruler2
+desc: Canvas-based screen measurement tool. Vanilla TypeScript, Canvas 2D API, localStorage.
+repo: https://github.com/H1D/calipr
+
+features[7]{id,name,domain,status,files,added}:
+  1,Strategy Pattern Tools,architecture,done,src/tool.ts;src/tool-manager.ts;src/tools/,2026-02-12
+  2,Polyline Arc System,tools,done,src/polyline-arc.ts;src/tools/line-tool.ts,2026-02-12
+  3,Credit Card Calibration,calibration,done,src/tools/calibrate-tool.ts,2026-02-12
+  4,SVG Export,export,done,src/export-svg.ts,2026-02-12
+  5,Keyboard Presets,ui,done,src/keybindings.ts,2026-02-12
+  6,Dark Theme,ui,done,index.html;src/main.ts;src/renderer.ts,2026-02-13
+  7,Alignment Crosshair,ui,done,src/renderer.ts;src/main.ts,2026-02-13
+
+modules[10]{name,file,purpose}:
+  main,src/main.ts,App entry; DOM events; theme logic
+  types,src/types.ts,Point Measurement Calibration ToolType Unit
+  tool,src/tool.ts,Tool strategy interface and ToolActions
+  tool-manager,src/tool-manager.ts,Event delegation; shared state; drag/hover
+  renderer,src/renderer.ts,Canvas 2D drawing; ThemeColors palettes
+  utils,src/utils.ts,Geometry math; coordinate transforms
+  storage,src/storage.ts,localStorage persistence
+  keybindings,src/keybindings.ts,4 keyboard presets
+  export-svg,src/export-svg.ts,SVG export with arc segments
+  polyline-arc,src/polyline-arc.ts,Arc hold/drag gesture; tangent constraints
+
+toon_files[2]{file,scope}:
+  docs/decisions.toon,Architectural decision records
+  docs/tools.toon,Tool system details and implementations

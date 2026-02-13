@@ -1,0 +1,10 @@
+# Architectural Decision Records
+
+decisions[7]{id,title,context,choice,alternatives,date}:
+  1,Declarative ToolActions,Tools communicate results to manager,Return ToolActions objects; manager interprets,Direct state mutation; event emitter,2026-02-12
+  2,World coords with pan offset,Canvas needs scrolling,screenToWorld/worldToScreen with pan vector,CSS transform; virtual viewport,2026-02-12
+  3,localStorage persistence,Session persistence without backend,localStorage with JSON serialization,IndexedDB; cookies,2026-02-12
+  4,Credit card calibration,Need physical-to-pixel ratio,ISO 7810 card (85.6x53.98mm) overlay,Known-distance input; QR code,2026-02-12
+  5,Bulge-point arcs,Arcs in polylines need compact storage,Three-point (start/bulge/end) per segment,Center+radius+angles; Bezier curves,2026-02-12
+  6,Dual-layer theming,Dark mode for CSS UI and canvas,CSS vars for DOM + ThemeColors palette objects for canvas,Single CSS-only approach; canvas reads computed styles,2026-02-13
+  7,Crosshair as cross-tool concern,Alignment guides needed during point placement/drag,Computed in draw loop from existing manager state (isDragging/effectiveMousePos); no Tool interface changes,Per-tool crosshair logic; new ToolActions field,2026-02-13

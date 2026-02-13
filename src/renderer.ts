@@ -25,6 +25,7 @@ export interface ThemeColors {
   closeSnapText: string;
   snapTangent: string;
   snapPerpendicular: string;
+  crosshair: string;
   calFill: string;
   calStroke: string;
   calTitle: string;
@@ -61,6 +62,7 @@ export const LIGHT_COLORS: ThemeColors = {
   closeSnapText: "rgba(30, 64, 175, 0.6)",
   snapTangent: "rgba(0, 180, 0, 0.3)",
   snapPerpendicular: "rgba(0, 120, 255, 0.3)",
+  crosshair: "rgba(255, 60, 60, 0.3)",
   calFill: "rgba(220, 38, 38, 0.85)",
   calStroke: "#dc2626",
   calTitle: "#333",
@@ -97,6 +99,7 @@ export const DARK_COLORS: ThemeColors = {
   closeSnapText: "rgba(91, 141, 239, 0.6)",
   snapTangent: "rgba(0, 200, 0, 0.35)",
   snapPerpendicular: "rgba(60, 160, 255, 0.35)",
+  crosshair: "rgba(255, 100, 100, 0.3)",
   calFill: "rgba(248, 113, 113, 0.8)",
   calStroke: "#f87171",
   calTitle: "#e0e0e0",
@@ -409,6 +412,20 @@ export class Renderer {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(snapType, labelX, labelY);
+  }
+
+  drawCrosshair(p: Point) {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(p.x, -this.panY);
+    ctx.lineTo(p.x, -this.panY + this.height);
+    ctx.moveTo(-this.panX, p.y);
+    ctx.lineTo(-this.panX + this.width, p.y);
+    ctx.strokeStyle = this.colors.crosshair;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   drawRectangleMeasurement(a: Point, b: Point, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null) {
