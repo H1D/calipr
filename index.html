@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruler — Screen Measurement Tool</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #f8f9fa; }
+    canvas { display: block; cursor: crosshair; touch-action: none; }
+    #toolbar {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 4px;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 6px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      z-index: 100;
+      user-select: none;
+    }
+    .tool-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 14px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 11px;
+      color: #555;
+      transition: background 0.15s, color 0.15s;
+      position: relative;
+    }
+    .tool-btn:hover { background: #f0f0f0; }
+    .tool-btn.active { background: #e8e0ff; color: #6c47ff; }
+    .tool-btn svg { width: 20px; height: 20px; }
+    .tool-btn .shortcut {
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      font-size: 9px;
+      color: #aaa;
+      font-weight: 600;
+    }
+    .tool-btn.flash-calibrate {
+      animation: calibrate-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes calibrate-pulse {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+        background: rgba(220, 38, 38, 0.08);
+      }
+      50% {
+        box-shadow: 0 0 12px 4px rgba(220, 38, 38, 0.45);
+        background: rgba(220, 38, 38, 0.18);
+      }
+    }
+    .tool-btn.flash-calibrate::after {
+      content: "PLEASE CALIBRATE FIRST";
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fff;
+      color: #dc2626;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid #fca5a5;
+      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+      pointer-events: none;
+    }
+    .tool-btn.flash-calibrate::before {
+      content: "";
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #fca5a5;
+      pointer-events: none;
+    }
+    .settings-wrap {
+      position: relative;
+    }
+    #settings-panel {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: 0;
+      width: 240px;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+      z-index: 101;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: none;
+    }
+    #settings-panel.open { display: block; }
+    .settings-section {
+      margin-bottom: 14px;
+    }
+    .settings-section:last-child { margin-bottom: 0; }
+    .settings-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .settings-unit-btns {
+      display: flex;
+      gap: 2px;
+    }
+    .unit-btn {
+      padding: 4px 10px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #555;
+      transition: background 0.15s, color 0.15s;
+    }
+    .unit-btn:hover { background: #f0f0f0; }
+    .unit-btn.active { background: #e8e0ff; color: #6c47ff; }
+    #keybinding-select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #333;
+      background: #fff;
+      cursor: pointer;
+    }
+    #keybinding-select:focus { outline: 2px solid #6c47ff; outline-offset: -1px; }
+    #help-hint {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      color: #999;
+      z-index: 50;
+      pointer-events: none;
+      text-align: center;
+      transition: opacity 0.2s ease;
+    }
+    #zoom-toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e0e0e0;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 200;
+    }
+    #zoom-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #help-hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 1px 0 #bbb;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div id="zoom-toast">Zoom is disabled by design — it would compromise measurement accuracy</div>
+  <canvas id="canvas"></canvas>
+
+  <div id="help-hint"></div>
+
+  <div id="toolbar">
+    <button class="tool-btn active" data-tool="line">
+      <span class="shortcut">L</span>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="2,16 7,6 13,12 18,4"/>
+        <circle cx="7" cy="6" r="1.5" fill="currentColor"/>
+        <circle cx="13" cy="12" r="1.5" fill="currentColor"/>
+      </svg>
+      Line
+    </button>
+    <button class="tool-btn" data-tool="rectangle">
+      <span class="shortcut">R</span>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="14" height="10" rx="1"/>
+      </svg>
+      Rectangle
+    </button>
+    <button class="tool-btn" data-tool="circle">
+      <span class="shortcut">C</span>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <circle cx="10" cy="10" r="7"/>
+        <line x1="10" y1="10" x2="17" y2="10" stroke-dasharray="2,2"/>
+      </svg>
+      Circle
+    </button>
+    <div style="width:1px;background:#e0e0e0;margin:4px 4px"></div>
+    <button class="tool-btn" data-tool="calibrate">
+      <span class="shortcut">M</span>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="16" height="12" rx="2"/>
+        <line x1="6" y1="8" x2="6" y2="12"/>
+        <line x1="10" y1="7" x2="10" y2="13"/>
+        <line x1="14" y1="8" x2="14" y2="12"/>
+      </svg>
+      Calibrate
+    </button>
+    <div style="width:1px;background:#e0e0e0;margin:4px 4px"></div>
+    <button class="tool-btn" data-tool="clear" id="clear-btn">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 5l10 10M15 5L5 15"/>
+      </svg>
+      Clear
+    </button>
+    <div style="width:1px;background:#e0e0e0;margin:4px 4px"></div>
+    <button class="tool-btn" id="export-svg-btn">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 3v10M6 9l4 4 4-4"/>
+        <path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2"/>
+      </svg>
+      SVG
+    </button>
+    <div class="settings-wrap">
+      <button class="tool-btn" id="settings-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        Settings
+      </button>
+      <div id="settings-panel">
+        <div class="settings-section">
+          <div class="settings-label">Unit</div>
+          <div class="settings-unit-btns" id="unit-selector">
+            <button class="unit-btn active" data-unit="mm">mm</button>
+            <button class="unit-btn" data-unit="cm">cm</button>
+            <button class="unit-btn" data-unit="in">in</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Keybindings</div>
+          <select id="keybinding-select"></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
