@@ -46,12 +46,55 @@ const settingsPanel = document.getElementById("settings-panel")!;
 const keybindingSelect = document.getElementById("keybinding-select") as HTMLSelectElement;
 const exportSvgBtn = document.getElementById("export-svg-btn")!;
 const zoomToast = document.getElementById("zoom-toast")!;
+const themeSelector = document.getElementById("theme-selector")!;
+
+// --- Theme ---
+type ThemePreference = "auto" | "light" | "dark";
+const THEME_KEY = "ruler2_theme";
+const darkMQ = window.matchMedia("(prefers-color-scheme: dark)");
+
+function loadThemePreference(): ThemePreference {
+  const v = localStorage.getItem(THEME_KEY);
+  if (v === "light" || v === "dark") return v;
+  return "auto";
+}
+
+function saveThemePreference(pref: ThemePreference) {
+  localStorage.setItem(THEME_KEY, pref);
+}
+
+function resolveTheme(pref: ThemePreference): "light" | "dark" {
+  if (pref === "auto") return darkMQ.matches ? "dark" : "light";
+  return pref;
+}
+
+let themePref = loadThemePreference();
+
+function applyTheme() {
+  const resolved = resolveTheme(themePref);
+  const isDark = resolved === "dark";
+  document.documentElement.setAttribute("data-theme", resolved);
+  renderer.setTheme(isDark);
+}
+
+function updateThemeUI() {
+  themeSelector.querySelectorAll(".unit-btn").forEach((btn) => {
+    const el = btn as HTMLElement;
+    el.classList.toggle("active", el.dataset.themePref === themePref);
+  });
+}
+
+darkMQ.addEventListener("change", () => {
+  if (themePref === "auto") applyTheme();
+});
 
 // Keybinding preset
 let presetIndex = loadPresetIndex();
 let currentPreset = PRESETS[presetIndex]!;
 
 // --- Initialize ---
+applyTheme();
+updateThemeUI();
 renderer.setPan(manager.panX, manager.panY);
 initSettingsPanel();
 updateCalibrateButtonFlash();
@@ -300,6 +343,18 @@ function initSettingsPanel() {
   exportSvgBtn.addEventListener("click", () => {
     const svg = exportSVG(manager.measurements, manager.calibration, manager.unit);
     downloadSVG(svg, "ruler-measurements.svg");
+  });
+
+  themeSelector.addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest(".unit-btn") as HTMLElement | null;
+    if (!btn) return;
+    const pref = btn.dataset.themePref as ThemePreference | undefined;
+    if (pref) {
+      themePref = pref;
+      saveThemePreference(pref);
+      applyTheme();
+      updateThemeUI();
+    }
   });
 }
 

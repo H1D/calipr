@@ -5,8 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ruler — Screen Measurement Tool</title>
   <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #fff;
+      --surface-hover: #f0f0f0;
+      --border: #e0e0e0;
+      --separator: #e0e0e0;
+      --shadow: rgba(0,0,0,0.08);
+      --shadow-lg: rgba(0,0,0,0.10);
+      --text: #333;
+      --text-secondary: #555;
+      --text-muted: #888;
+      --text-hint: #999;
+      --text-shortcut: #aaa;
+      --active-bg: #dbeafe;
+      --active-text: #1e40af;
+      --focus-ring: #1e40af;
+      --kbd-bg: #f0f0f0;
+      --kbd-border: #ccc;
+      --kbd-shadow: #bbb;
+      --kbd-text: #333;
+      --select-bg: #fff;
+      --select-border: #e0e0e0;
+      --select-text: #333;
+      --cal-flash-bg-0: rgba(220, 38, 38, 0.08);
+      --cal-flash-bg-50: rgba(220, 38, 38, 0.18);
+      --cal-flash-shadow: rgba(220, 38, 38, 0.4);
+      --cal-flash-shadow-50: rgba(220, 38, 38, 0.45);
+      --cal-flash-text: #dc2626;
+      --cal-flash-border: #fca5a5;
+      --cal-flash-tooltip-bg: #fff;
+      --cal-flash-tooltip-shadow: rgba(220, 38, 38, 0.15);
+      --toast-bg: #1a1a2e;
+      --toast-border: #2a2a4a;
+      --toast-text: #e0e0e0;
+      --toast-shadow: rgba(0,0,0,0.25);
+      --github-text: #555;
+      --github-text-hover: #1e40af;
+    }
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #1a1a2e;
+      --surface: #2a2a3e;
+      --surface-hover: #3a3a4e;
+      --border: #3a3a50;
+      --separator: #3a3a50;
+      --shadow: rgba(0,0,0,0.25);
+      --shadow-lg: rgba(0,0,0,0.35);
+      --text: #e0e0e0;
+      --text-secondary: #b0b0b0;
+      --text-muted: #808090;
+      --text-hint: #707080;
+      --text-shortcut: #606070;
+      --active-bg: rgba(59,108,245,0.2);
+      --active-text: #6b9fff;
+      --focus-ring: #6b9fff;
+      --kbd-bg: #3a3a4e;
+      --kbd-border: #4a4a5e;
+      --kbd-shadow: #2a2a3e;
+      --kbd-text: #d0d0d0;
+      --select-bg: #2a2a3e;
+      --select-border: #3a3a50;
+      --select-text: #e0e0e0;
+      --cal-flash-bg-0: rgba(248, 113, 113, 0.1);
+      --cal-flash-bg-50: rgba(248, 113, 113, 0.2);
+      --cal-flash-shadow: rgba(248, 113, 113, 0.3);
+      --cal-flash-shadow-50: rgba(248, 113, 113, 0.4);
+      --cal-flash-text: #f87171;
+      --cal-flash-border: #7f1d1d;
+      --cal-flash-tooltip-bg: #2a2a3e;
+      --cal-flash-tooltip-shadow: rgba(248, 113, 113, 0.15);
+      --toast-bg: #2a2a3e;
+      --toast-border: #3a3a50;
+      --toast-text: #e0e0e0;
+      --toast-shadow: rgba(0,0,0,0.4);
+      --github-text: #b0b0b0;
+      --github-text-hover: #6b9fff;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #f8f9fa; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
     canvas { display: block; cursor: crosshair; touch-action: none; }
     #toolbar {
       position: fixed;
@@ -15,11 +92,11 @@
       transform: translateX(-50%);
       display: flex;
       gap: 4px;
-      background: #fff;
-      border: 1px solid #e0e0e0;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 6px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 12px var(--shadow);
       z-index: 100;
       user-select: none;
     }
@@ -35,32 +112,37 @@
       cursor: pointer;
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 11px;
-      color: #555;
+      color: var(--text-secondary);
       transition: background 0.15s, color 0.15s;
       position: relative;
     }
-    .tool-btn:hover { background: #f0f0f0; }
-    .tool-btn.active { background: #e8e0ff; color: #6c47ff; }
+    .tool-btn:hover { background: var(--surface-hover); }
+    .tool-btn.active { background: var(--active-bg); color: var(--active-text); }
     .tool-btn svg { width: 20px; height: 20px; }
     .tool-btn .shortcut {
       position: absolute;
       top: 2px;
       right: 4px;
       font-size: 9px;
-      color: #aaa;
+      color: var(--text-shortcut);
       font-weight: 600;
+    }
+    .toolbar-sep {
+      width: 1px;
+      background: var(--separator);
+      margin: 4px;
     }
     .tool-btn.flash-calibrate {
       animation: calibrate-pulse 1.2s ease-in-out infinite;
     }
     @keyframes calibrate-pulse {
       0%, 100% {
-        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
-        background: rgba(220, 38, 38, 0.08);
+        box-shadow: 0 0 0 0 var(--cal-flash-shadow);
+        background: var(--cal-flash-bg-0);
       }
       50% {
-        box-shadow: 0 0 12px 4px rgba(220, 38, 38, 0.45);
-        background: rgba(220, 38, 38, 0.18);
+        box-shadow: 0 0 12px 4px var(--cal-flash-shadow-50);
+        background: var(--cal-flash-bg-50);
       }
     }
     .tool-btn.flash-calibrate::after {
@@ -69,15 +151,15 @@
       bottom: calc(100% + 10px);
       left: 50%;
       transform: translateX(-50%);
-      background: #fff;
-      color: #dc2626;
+      background: var(--cal-flash-tooltip-bg);
+      color: var(--cal-flash-text);
       font-size: 11px;
       font-weight: 700;
       white-space: nowrap;
       padding: 5px 10px;
       border-radius: 6px;
-      border: 1px solid #fca5a5;
-      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+      border: 1px solid var(--cal-flash-border);
+      box-shadow: 0 2px 8px var(--cal-flash-tooltip-shadow);
       pointer-events: none;
     }
     .tool-btn.flash-calibrate::before {
@@ -87,7 +169,7 @@
       left: 50%;
       transform: translateX(-50%);
       border: 6px solid transparent;
-      border-top-color: #fca5a5;
+      border-top-color: var(--cal-flash-border);
       pointer-events: none;
     }
     .settings-wrap {
@@ -98,11 +180,11 @@
       bottom: calc(100% + 8px);
       right: 0;
       width: 240px;
-      background: #fff;
-      border: 1px solid #e0e0e0;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+      box-shadow: 0 4px 20px var(--shadow-lg);
       z-index: 101;
       font-family: 'Segoe UI', system-ui, sans-serif;
       display: none;
@@ -115,7 +197,7 @@
     .settings-label {
       font-size: 11px;
       font-weight: 600;
-      color: #888;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 6px;
@@ -131,23 +213,23 @@
       border-radius: 6px;
       cursor: pointer;
       font-size: 12px;
-      color: #555;
+      color: var(--text-secondary);
       transition: background 0.15s, color 0.15s;
     }
-    .unit-btn:hover { background: #f0f0f0; }
-    .unit-btn.active { background: #e8e0ff; color: #6c47ff; }
+    .unit-btn:hover { background: var(--surface-hover); }
+    .unit-btn.active { background: var(--active-bg); color: var(--active-text); }
     #keybinding-select {
       width: 100%;
       padding: 6px 8px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid var(--select-border);
       border-radius: 6px;
       font-size: 12px;
       font-family: 'Segoe UI', system-ui, sans-serif;
-      color: #333;
-      background: #fff;
+      color: var(--select-text);
+      background: var(--select-bg);
       cursor: pointer;
     }
-    #keybinding-select:focus { outline: 2px solid #6c47ff; outline-offset: -1px; }
+    #keybinding-select:focus { outline: 2px solid var(--focus-ring); outline-offset: -1px; }
     #help-hint {
       position: fixed;
       bottom: 90px;
@@ -155,7 +237,7 @@
       transform: translateX(-50%);
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 13px;
-      color: #999;
+      color: var(--text-hint);
       z-index: 50;
       pointer-events: none;
       text-align: center;
@@ -166,15 +248,15 @@
       top: 24px;
       left: 50%;
       transform: translateX(-50%) translateY(-8px);
-      background: #1a1a2e;
-      border: 1px solid #2a2a4a;
+      background: var(--toast-bg);
+      border: 1px solid var(--toast-border);
       border-radius: 10px;
       padding: 12px 24px;
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 14px;
       font-weight: 500;
-      color: #e0e0e0;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+      color: var(--toast-text);
+      box-shadow: 0 4px 24px var(--toast-shadow);
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.25s ease, transform 0.25s ease;
@@ -186,12 +268,23 @@
       padding: 1px 6px;
       font-size: 11px;
       font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #f0f0f0;
-      border: 1px solid #ccc;
+      background: var(--kbd-bg);
+      border: 1px solid var(--kbd-border);
       border-radius: 4px;
-      box-shadow: 0 1px 0 #bbb;
-      color: #333;
+      box-shadow: 0 1px 0 var(--kbd-shadow);
+      color: var(--kbd-text);
     }
+    .github-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--github-text);
+      text-decoration: none;
+      font-size: 12px;
+      transition: color 0.15s;
+    }
+    .github-link:hover { color: var(--github-text-hover); }
+    .github-link svg { width: 16px; height: 16px; }
   </style>
 </head>
 <body>
@@ -225,7 +318,7 @@
       </svg>
       Circle
     </button>
-    <div style="width:1px;background:#e0e0e0;margin:4px 4px"></div>
+    <div class="toolbar-sep"></div>
     <button class="tool-btn" data-tool="calibrate">
       <span class="shortcut">M</span>
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -236,14 +329,14 @@
       </svg>
       Calibrate
     </button>
-    <div style="width:1px;background:#e0e0e0;margin:4px 4px"></div>
+    <div class="toolbar-sep"></div>
     <button class="tool-btn" data-tool="clear" id="clear-btn">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 5l10 10M15 5L5 15"/>
       </svg>
       Clear
     </button>
-    <div style="width:1px;background:#e0e0e0;margin:4px 4px"></div>
+    <div class="toolbar-sep"></div>
     <button class="tool-btn" id="export-svg-btn">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10 3v10M6 9l4 4 4-4"/>
@@ -271,6 +364,20 @@
         <div class="settings-section">
           <div class="settings-label">Keybindings</div>
           <select id="keybinding-select"></select>
+        </div>
+        <div class="settings-section">
+          <div class="settings-label">Theme</div>
+          <div class="settings-unit-btns" id="theme-selector">
+            <button class="unit-btn active" data-theme-pref="auto">Auto</button>
+            <button class="unit-btn" data-theme-pref="light">Light</button>
+            <button class="unit-btn" data-theme-pref="dark">Dark</button>
+          </div>
+        </div>
+        <div class="settings-section">
+          <a class="github-link" href="https://github.com/H1D/calipr" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            GitHub
+          </a>
         </div>
       </div>
     </div>

@@ -2,16 +2,117 @@ import type { Point, Measurement, Calibration, Unit, PolylineSegment } from "./t
 import { distToUnit, formatValue, midpoint, pxToUnit, arcLengthToUnit, circumscribedCircle, angleSweepThrough, gridVisibleRange } from "./utils";
 
 const POINT_RADIUS = 5;
-const POINT_COLOR = "#6c47ff";
-const POINT_HOVER_COLOR = "#9b7aff";
-const LINE_COLOR = "#6c47ff";
 const LINE_WIDTH = 2;
-const PREVIEW_COLOR = "rgba(108, 71, 255, 0.5)";
-const LABEL_BG = "rgba(255, 255, 255, 0.92)";
-const LABEL_COLOR = "#333";
 const LABEL_FONT = "13px 'Segoe UI', system-ui, sans-serif";
-const GRID_COLOR = "rgba(0,0,0,0.04)";
 const GRID_STEP = 50;
+
+export interface ThemeColors {
+  bg: string;
+  grid: string;
+  point: string;
+  pointHover: string;
+  pointStroke: string;
+  line: string;
+  preview: string;
+  labelBg: string;
+  labelText: string;
+  labelBorder: string;
+  shapeFill: string;
+  bulge: string;
+  bulgeHover: string;
+  bulgeStroke: string;
+  closeSnapRing: string;
+  closeSnapText: string;
+  snapTangent: string;
+  snapPerpendicular: string;
+  calFill: string;
+  calStroke: string;
+  calTitle: string;
+  calText: string;
+  calDim: string;
+  calBtnBg: string;
+  calBtnStroke: string;
+  calBtnText: string;
+  calBtnLabel: string;
+  calConfirmBg: string;
+  calConfirmText: string;
+  calCancelBg: string;
+  calCancelText: string;
+  calCornerBg: string;
+  calCornerText: string;
+}
+
+export const LIGHT_COLORS: ThemeColors = {
+  bg: "#f8f9fa",
+  grid: "rgba(0,0,0,0.04)",
+  point: "#1e40af",
+  pointHover: "#3b6cf5",
+  pointStroke: "#fff",
+  line: "#1e40af",
+  preview: "rgba(30, 64, 175, 0.5)",
+  labelBg: "rgba(255, 255, 255, 0.92)",
+  labelText: "#333",
+  labelBorder: "#e0e0e0",
+  shapeFill: "rgba(30, 64, 175, 0.12)",
+  bulge: "#ff6b3d",
+  bulgeHover: "#ff9b7a",
+  bulgeStroke: "#fff",
+  closeSnapRing: "rgba(30, 64, 175, 0.5)",
+  closeSnapText: "rgba(30, 64, 175, 0.6)",
+  snapTangent: "rgba(0, 180, 0, 0.3)",
+  snapPerpendicular: "rgba(0, 120, 255, 0.3)",
+  calFill: "rgba(220, 38, 38, 0.85)",
+  calStroke: "#dc2626",
+  calTitle: "#333",
+  calText: "#666",
+  calDim: "#999",
+  calBtnBg: "#f5f5f5",
+  calBtnStroke: "#ccc",
+  calBtnText: "#333",
+  calBtnLabel: "#333",
+  calConfirmBg: "#dcfce7",
+  calConfirmText: "#166534",
+  calCancelBg: "#fee2e2",
+  calCancelText: "#991b1b",
+  calCornerBg: "#e8e8ff",
+  calCornerText: "#444",
+};
+
+export const DARK_COLORS: ThemeColors = {
+  bg: "#1a1a2e",
+  grid: "rgba(255,255,255,0.06)",
+  point: "#5b8def",
+  pointHover: "#7da8ff",
+  pointStroke: "#1a1a2e",
+  line: "#5b8def",
+  preview: "rgba(91, 141, 239, 0.5)",
+  labelBg: "rgba(42, 42, 62, 0.92)",
+  labelText: "#e0e0e0",
+  labelBorder: "#3a3a50",
+  shapeFill: "rgba(91, 141, 239, 0.15)",
+  bulge: "#ff6b3d",
+  bulgeHover: "#ff9b7a",
+  bulgeStroke: "#1a1a2e",
+  closeSnapRing: "rgba(91, 141, 239, 0.5)",
+  closeSnapText: "rgba(91, 141, 239, 0.6)",
+  snapTangent: "rgba(0, 200, 0, 0.35)",
+  snapPerpendicular: "rgba(60, 160, 255, 0.35)",
+  calFill: "rgba(248, 113, 113, 0.8)",
+  calStroke: "#f87171",
+  calTitle: "#e0e0e0",
+  calText: "#b0b0b0",
+  calDim: "#808090",
+  calBtnBg: "#3a3a4e",
+  calBtnStroke: "#4a4a5e",
+  calBtnText: "#e0e0e0",
+  calBtnLabel: "#e0e0e0",
+  calConfirmBg: "#1a3a2a",
+  calConfirmText: "#6ee7b7",
+  calCancelBg: "#3a1a1a",
+  calCancelText: "#fca5a5",
+  calCornerBg: "#2a2a4e",
+  calCornerText: "#b0b0d0",
+};
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -20,10 +121,15 @@ export class Renderer {
   private dpr = 1;
   private panX = 0;
   private panY = 0;
+  colors: ThemeColors = LIGHT_COLORS;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
     this.resize();
+  }
+
+  setTheme(isDark: boolean) {
+    this.colors = isDark ? DARK_COLORS : LIGHT_COLORS;
   }
 
   resize() {
@@ -49,13 +155,14 @@ export class Renderer {
   clear() {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.clearRect(0, 0, this.width, this.height);
+    ctx.fillStyle = this.colors.bg;
+    ctx.fillRect(0, 0, this.width, this.height);
     ctx.translate(this.panX, this.panY);
   }
 
   drawGrid() {
     const ctx = this.ctx;
-    ctx.strokeStyle = GRID_COLOR;
+    ctx.strokeStyle = this.colors.grid;
     ctx.lineWidth = 1;
     const { startX, startY, endX, endY } = gridVisibleRange(this.panX, this.panY, this.width, this.height, GRID_STEP);
     for (let x = startX; x <= endX; x += GRID_STEP) {
@@ -76,9 +183,9 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.beginPath();
     ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = hovered ? POINT_HOVER_COLOR : POINT_COLOR;
+    ctx.fillStyle = hovered ? this.colors.pointHover : this.colors.point;
     ctx.fill();
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = this.colors.pointStroke;
     ctx.lineWidth = 2;
     ctx.stroke();
   }
@@ -88,7 +195,7 @@ export class Renderer {
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = preview ? PREVIEW_COLOR : LINE_COLOR;
+    ctx.strokeStyle = preview ? this.colors.preview : this.colors.line;
     ctx.lineWidth = LINE_WIDTH;
     ctx.setLineDash(preview ? [6, 4] : []);
     ctx.stroke();
@@ -104,15 +211,15 @@ export class Renderer {
     const x = pos.x + offset.x - w / 2;
     const y = pos.y + offset.y - h / 2;
 
-    ctx.fillStyle = LABEL_BG;
+    ctx.fillStyle = this.colors.labelBg;
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, 4);
     ctx.fill();
-    ctx.strokeStyle = "#e0e0e0";
+    ctx.strokeStyle = this.colors.labelBorder;
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.fillStyle = LABEL_COLOR;
+    ctx.fillStyle = this.colors.labelText;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(text, pos.x + offset.x, pos.y + offset.y);
@@ -154,7 +261,7 @@ export class Renderer {
 
     ctx.beginPath();
     ctx.arc(circle.cx, circle.cy, circle.r, a1, a3, ccw);
-    ctx.strokeStyle = preview ? PREVIEW_COLOR : LINE_COLOR;
+    ctx.strokeStyle = preview ? this.colors.preview : this.colors.line;
     ctx.lineWidth = LINE_WIDTH;
     ctx.setLineDash(preview ? [6, 4] : []);
     ctx.stroke();
@@ -187,7 +294,7 @@ export class Renderer {
         prev = seg.end;
       }
       ctx.closePath();
-      ctx.fillStyle = "rgba(108, 71, 255, 0.06)";
+      ctx.fillStyle = this.colors.shapeFill;
       ctx.fill();
     }
 
@@ -246,9 +353,9 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.beginPath();
     ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = hovered ? "#ff9b7a" : "#ff6b3d";
+    ctx.fillStyle = hovered ? this.colors.bulgeHover : this.colors.bulge;
     ctx.fill();
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = this.colors.bulgeStroke;
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
@@ -258,14 +365,14 @@ export class Renderer {
     // Outer pulsing ring
     ctx.beginPath();
     ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(108, 71, 255, 0.5)";
+    ctx.strokeStyle = this.colors.closeSnapRing;
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
     // Label
     ctx.font = "10px 'Segoe UI', system-ui, sans-serif";
-    ctx.fillStyle = "rgba(108, 71, 255, 0.6)";
+    ctx.fillStyle = this.colors.closeSnapText;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText("close", p.x + 18, p.y);
@@ -276,8 +383,8 @@ export class Renderer {
     const extent = 2000;
 
     const color = snapType === "tangent"
-      ? "rgba(0, 180, 0, 0.3)"
-      : "rgba(0, 120, 255, 0.3)";
+      ? this.colors.snapTangent
+      : this.colors.snapPerpendicular;
 
     // Draw dashed guide line extending in both directions
     const x1 = from.x - direction.x * extent;
@@ -312,11 +419,11 @@ export class Renderer {
     const h = Math.abs(b.y - a.y);
 
     // Fill
-    ctx.fillStyle = "rgba(108, 71, 255, 0.06)";
+    ctx.fillStyle = this.colors.shapeFill;
     ctx.fillRect(x, y, w, h);
 
     // Stroke
-    ctx.strokeStyle = LINE_COLOR;
+    ctx.strokeStyle = this.colors.line;
     ctx.lineWidth = LINE_WIDTH;
     ctx.strokeRect(x, y, w, h);
 
@@ -341,9 +448,9 @@ export class Renderer {
     // Fill
     ctx.beginPath();
     ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(108, 71, 255, 0.06)";
+    ctx.fillStyle = this.colors.shapeFill;
     ctx.fill();
-    ctx.strokeStyle = LINE_COLOR;
+    ctx.strokeStyle = this.colors.line;
     ctx.lineWidth = LINE_WIDTH;
     ctx.stroke();
 
@@ -369,12 +476,12 @@ export class Renderer {
     // ISO 7810 credit card corner radius: 3.18mm on an 85.6mm wide card
     const cornerRadiusPx = 3.18 * (widthPx / 85.6);
 
-    ctx.fillStyle = "rgba(220, 38, 38, 0.85)";
+    ctx.fillStyle = this.colors.calFill;
     ctx.beginPath();
     ctx.roundRect(x, y, widthPx, heightPx, cornerRadiusPx);
     ctx.fill();
 
-    ctx.strokeStyle = "#dc2626";
+    ctx.strokeStyle = this.colors.calStroke;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(x, y, widthPx, heightPx, cornerRadiusPx);
@@ -399,13 +506,13 @@ export class Renderer {
     const textBaseY = Math.max(80, y - 100); // ensure text stays within screen bounds
 
     ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
-    ctx.fillStyle = "#333";
+    ctx.fillStyle = this.colors.calTitle;
     ctx.textAlign = textAlign;
     ctx.textBaseline = "middle";
-    ctx.fillText("Place your 💳credit card against the screen corner", textX, textBaseY);
+    ctx.fillText("Place your \u{1F4B3}credit card against the screen corner", textX, textBaseY);
 
     ctx.font = "13px 'Segoe UI', system-ui, sans-serif";
-    ctx.fillStyle = "#666";
+    ctx.fillStyle = this.colors.calText;
     ctx.textAlign = textAlign;
     ctx.fillText("Adjust size until card covers the red rectangle", textX, textBaseY + 22);
     ctx.textAlign = textAlign;
@@ -415,7 +522,7 @@ export class Renderer {
 
     // Show current dimensions
     ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
-    ctx.fillStyle = "#999";
+    ctx.fillStyle = this.colors.calDim;
     ctx.textAlign = textAlign;
     ctx.fillText(`${widthPx.toFixed(1)} \u00D7 ${heightPx.toFixed(1)} px`, textX, textBaseY + 82);
 
@@ -435,12 +542,12 @@ export class Renderer {
     const panelY = this.height - 240;
 
     // Helper to draw a small button and register its hit area
-    const drawBtn = (bx: number, by: number, bw: number, bh: number, label: string, action: string, color = "#f5f5f5", textColor = "#333", rotation = 0) => {
+    const drawBtn = (bx: number, by: number, bw: number, bh: number, label: string, action: string, color: string, textColor: string, rotation = 0) => {
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.roundRect(bx, by, bw, bh, 4);
       ctx.fill();
-      ctx.strokeStyle = "#ccc";
+      ctx.strokeStyle = this.colors.calBtnStroke;
       ctx.lineWidth = 1;
       ctx.stroke();
 
@@ -468,27 +575,27 @@ export class Renderer {
       let cx = panelX;
 
       // [<<] coarse minus
-      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u00AB", actions.coarseMinus, "#f5f5f5", "#333", rotation);
+      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u00AB", actions.coarseMinus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
       cx += arrowBtnW + btnGap;
 
       // [<] fine minus
-      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u2039", actions.fineMinus, "#f5f5f5", "#333", rotation);
+      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u2039", actions.fineMinus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
       cx += arrowBtnW + btnGap;
 
       // Center label
       ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
-      ctx.fillStyle = "#333";
+      ctx.fillStyle = this.colors.calBtnLabel;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, cx + labelW / 2, rowY + arrowBtnH / 2);
       cx += labelW + btnGap;
 
       // [>] fine plus
-      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u203A", actions.finePlus, "#f5f5f5", "#333", rotation);
+      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u203A", actions.finePlus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
       cx += arrowBtnW + btnGap;
 
       // [>>] coarse plus
-      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u00BB", actions.coarsePlus, "#f5f5f5", "#333", rotation);
+      drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u00BB", actions.coarsePlus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
     };
 
     // Row 1: Width  [«] [‹] Width [›] [»]
@@ -503,21 +610,21 @@ export class Renderer {
     // Row 2: Height — same «‹›» symbols rotated -90° (CCW → pointing up/down)
     rowY += rowH + 2;
     drawArrowRow(rowY, "Height", {
-      coarseMinus: "height+",
-      fineMinus: "height+fine",
-      finePlus: "height-fine",
-      coarsePlus: "height-",
+      coarseMinus: "height-",
+      fineMinus: "height-fine",
+      finePlus: "height+fine",
+      coarsePlus: "height+",
     }, -Math.PI / 2);
 
     // Row 3: Switch Corner (full width)
     rowY += rowH + 8;
-    drawBtn(panelX, rowY, panelW, arrowBtnH, "Switch Corner", "switch-corner", "#e8e8ff", "#444");
+    drawBtn(panelX, rowY, panelW, arrowBtnH, "Switch Corner", "switch-corner", this.colors.calCornerBg, this.colors.calCornerText);
 
     // Row 4: Confirm / Cancel
     rowY += arrowBtnH + btnGap;
     const halfW = (panelW - btnGap) / 2;
-    drawBtn(panelX, rowY, halfW, arrowBtnH, "Confirm", "confirm", "#dcfce7", "#166534");
-    drawBtn(panelX + halfW + btnGap, rowY, halfW, arrowBtnH, "Cancel", "cancel", "#fee2e2", "#991b1b");
+    drawBtn(panelX, rowY, halfW, arrowBtnH, "Confirm", "confirm", this.colors.calConfirmBg, this.colors.calConfirmText);
+    drawBtn(panelX + halfW + btnGap, rowY, halfW, arrowBtnH, "Cancel", "cancel", this.colors.calCancelBg, this.colors.calCancelText);
 
     return { x, y, buttons };
   }

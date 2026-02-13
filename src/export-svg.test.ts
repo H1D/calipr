@@ -41,7 +41,7 @@ describe("exportSVG", () => {
     // No labels
     expect(svg).not.toContain("<text");
     // No colors
-    expect(svg).not.toContain("#6c47ff");
+    expect(svg).not.toContain("#1e40af");
   });
 
   test("circle produces bare <circle> with no radius line", () => {
