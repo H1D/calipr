@@ -228,16 +228,16 @@ export class Renderer {
     ctx.fillText(text, pos.x + offset.x, pos.y + offset.y);
   }
 
-  drawMeasurement(m: Measurement, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null) {
+  drawMeasurement(m: Measurement, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null, hideLabels = false) {
     switch (m.kind) {
       case "polyline":
-        this.drawPolylineMeasurement(m.start, m.segments, !!m.closed, cal, unit, mousePos, hoveredPointIdx);
+        this.drawPolylineMeasurement(m.start, m.segments, !!m.closed, cal, unit, mousePos, hoveredPointIdx, hideLabels);
         break;
       case "rectangle":
-        this.drawRectangleMeasurement(m.points[0], m.points[1], cal, unit, hoveredPointIdx);
+        this.drawRectangleMeasurement(m.points[0], m.points[1], cal, unit, hoveredPointIdx, hideLabels);
         break;
       case "circle":
-        this.drawCircleMeasurement(m.center, m.radiusPx, cal, unit, hoveredPointIdx);
+        this.drawCircleMeasurement(m.center, m.radiusPx, cal, unit, hoveredPointIdx, hideLabels);
         break;
     }
   }
@@ -271,7 +271,7 @@ export class Renderer {
     ctx.setLineDash([]);
   }
 
-  drawPolylineMeasurement(start: Point, segments: PolylineSegment[], closed: boolean, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null) {
+  drawPolylineMeasurement(start: Point, segments: PolylineSegment[], closed: boolean, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null, hideLabels = false) {
     const ctx = this.ctx;
 
     // Draw fill if closed
@@ -308,25 +308,34 @@ export class Renderer {
     pointIdx++;
 
     let prev = start;
-    for (const seg of segments) {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i]!;
       if (seg.bulge) {
         // Arc segment
         this.drawArc(prev, seg.bulge, seg.end);
-        const len = arcLengthToUnit(prev, seg.bulge, seg.end, cal, unit);
-        const mid = midpoint(prev, seg.end);
-        this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+        if (!hideLabels) {
+          const len = arcLengthToUnit(prev, seg.bulge, seg.end, cal, unit);
+          const mid = midpoint(prev, seg.end);
+          this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+        }
         // Draw bulge control point (smaller, different style)
         this.drawBulgePoint(seg.bulge, hoveredPointIdx === pointIdx);
         pointIdx++;
       } else {
         // Straight segment
         this.drawLine(prev, seg.end);
-        const len = distToUnit(prev, seg.end, cal, unit);
-        const mid = midpoint(prev, seg.end);
-        this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+        if (!hideLabels) {
+          const len = distToUnit(prev, seg.end, cal, unit);
+          const mid = midpoint(prev, seg.end);
+          this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+        }
       }
-      // Draw endpoint
-      this.drawPoint(seg.end, hoveredPointIdx === pointIdx);
+      // Draw endpoint (skip if closed and this is the closing segment overlapping start)
+      const isClosingDup = closed && i === segments.length - 1
+        && (seg.end.x - start.x) ** 2 + (seg.end.y - start.y) ** 2 < 0.25;
+      if (!isClosingDup) {
+        this.drawPoint(seg.end, hoveredPointIdx === pointIdx);
+      }
       pointIdx++;
       prev = seg.end;
     }
@@ -337,18 +346,22 @@ export class Renderer {
       const dy = prev.y - start.y;
       if (dx * dx + dy * dy > 0.25) {
         this.drawLine(prev, start);
-        const len = distToUnit(prev, start, cal, unit);
-        const mid = midpoint(prev, start);
-        this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+        if (!hideLabels) {
+          const len = distToUnit(prev, start, cal, unit);
+          const mid = midpoint(prev, start);
+          this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+        }
       }
     }
 
     // Preview line to mouse (only when not closed)
     if (!closed && mousePos) {
       this.drawLine(prev, mousePos, true);
-      const len = distToUnit(prev, mousePos, cal, unit);
-      const mid = midpoint(prev, mousePos);
-      this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+      if (!hideLabels) {
+        const len = distToUnit(prev, mousePos, cal, unit);
+        const mid = midpoint(prev, mousePos);
+        this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
+      }
     }
   }
 
@@ -428,7 +441,7 @@ export class Renderer {
     ctx.setLineDash([]);
   }
 
-  drawRectangleMeasurement(a: Point, b: Point, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null) {
+  drawRectangleMeasurement(a: Point, b: Point, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null, hideLabels = false) {
     const ctx = this.ctx;
     const x = Math.min(a.x, b.x);
     const y = Math.min(a.y, b.y);
@@ -444,22 +457,24 @@ export class Renderer {
     ctx.lineWidth = LINE_WIDTH;
     ctx.strokeRect(x, y, w, h);
 
-    // Width label (top)
-    const topMid: Point = { x: x + w / 2, y };
-    const wVal = distToUnit({ x: a.x, y: 0 }, { x: b.x, y: 0 }, cal, unit);
-    this.drawLabel(formatValue(wVal, unit), topMid, { x: 0, y: -18 });
+    if (!hideLabels) {
+      // Width label (top)
+      const topMid: Point = { x: x + w / 2, y };
+      const wVal = distToUnit({ x: a.x, y: 0 }, { x: b.x, y: 0 }, cal, unit);
+      this.drawLabel(formatValue(wVal, unit), topMid, { x: 0, y: -18 });
 
-    // Height label (right)
-    const rightMid: Point = { x: x + w, y: y + h / 2 };
-    const hVal = distToUnit({ x: 0, y: a.y }, { x: 0, y: b.y }, cal, unit);
-    this.drawLabel(formatValue(hVal, unit), rightMid, { x: 24, y: 0 });
+      // Height label (right)
+      const rightMid: Point = { x: x + w, y: y + h / 2 };
+      const hVal = distToUnit({ x: 0, y: a.y }, { x: 0, y: b.y }, cal, unit);
+      this.drawLabel(formatValue(hVal, unit), rightMid, { x: 24, y: 0 });
+    }
 
     // Corner points
     this.drawPoint(a, hoveredPointIdx === 0);
     this.drawPoint(b, hoveredPointIdx === 1);
   }
 
-  drawCircleMeasurement(center: Point, radiusPx: number, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null) {
+  drawCircleMeasurement(center: Point, radiusPx: number, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null, hideLabels = false) {
     const ctx = this.ctx;
 
     // Fill
@@ -475,13 +490,15 @@ export class Renderer {
     const edgePoint: Point = { x: center.x + radiusPx, y: center.y };
     this.drawLine(center, edgePoint);
 
-    // Radius label
-    const rVal = pxToUnit(radiusPx, cal, unit);
-    const mid = midpoint(center, edgePoint);
-    this.drawLabel("r = " + formatValue(rVal, unit), mid, { x: 0, y: -20 });
+    if (!hideLabels) {
+      // Radius label
+      const rVal = pxToUnit(radiusPx, cal, unit);
+      const mid = midpoint(center, edgePoint);
+      this.drawLabel("r = " + formatValue(rVal, unit), mid, { x: 0, y: -20 });
 
-    // Diameter label
-    this.drawLabel("d = " + formatValue(rVal * 2, unit), center, { x: 0, y: 20 });
+      // Diameter label
+      this.drawLabel("d = " + formatValue(rVal * 2, unit), center, { x: 0, y: 20 });
+    }
 
     // Center point and edge point (both draggable)
     this.drawPoint(center, hoveredPointIdx === 0);

@@ -135,7 +135,7 @@ function draw() {
     // Draw completed measurements
     for (const m of manager.measurements) {
       const hIdx = manager.hoveredMeasurementId === m.id ? manager.hoveredPointIdx : null;
-      renderer.drawMeasurement(m, manager.calibration, manager.unit, null, hIdx);
+      renderer.drawMeasurement(m, manager.calibration, manager.unit, null, hIdx, manager.isDragging);
     }
 
     // Draw close snap ring during drag (editing completed measurement)
@@ -145,7 +145,7 @@ function draw() {
 
     // Draw active measurement
     if (drawState.activeMeasurement) {
-      renderer.drawMeasurement(drawState.activeMeasurement, manager.calibration, manager.unit, drawState.effectiveMousePos, null);
+      renderer.drawMeasurement(drawState.activeMeasurement, manager.calibration, manager.unit, drawState.effectiveMousePos, null, manager.isDragging);
 
       if (drawState.closeSnapRing) {
         renderer.drawCloseSnapRing(drawState.closeSnapRing);
