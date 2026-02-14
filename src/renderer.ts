@@ -12,6 +12,8 @@ export interface ThemeColors {
   point: string;
   pointHover: string;
   pointStroke: string;
+  pointSelected: string;
+  pointSelectedStroke: string;
   line: string;
   preview: string;
   labelBg: string;
@@ -49,6 +51,8 @@ export const LIGHT_COLORS: ThemeColors = {
   point: "#1e40af",
   pointHover: "#3b6cf5",
   pointStroke: "#fff",
+  pointSelected: "#f59e0b",
+  pointSelectedStroke: "#fff",
   line: "#1e40af",
   preview: "rgba(30, 64, 175, 0.5)",
   labelBg: "rgba(255, 255, 255, 0.92)",
@@ -86,6 +90,8 @@ export const DARK_COLORS: ThemeColors = {
   point: "#5b8def",
   pointHover: "#7da8ff",
   pointStroke: "#1a1a2e",
+  pointSelected: "#fbbf24",
+  pointSelectedStroke: "#1a1a2e",
   line: "#5b8def",
   preview: "rgba(91, 141, 239, 0.5)",
   labelBg: "rgba(42, 42, 62, 0.92)",
@@ -182,15 +188,25 @@ export class Renderer {
     }
   }
 
-  drawPoint(p: Point, hovered = false) {
+  drawPoint(p: Point, hovered = false, selected = false) {
     const ctx = this.ctx;
     ctx.beginPath();
     ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = hovered ? this.colors.pointHover : this.colors.point;
+    ctx.fillStyle = selected ? this.colors.pointSelected : hovered ? this.colors.pointHover : this.colors.point;
     ctx.fill();
-    ctx.strokeStyle = this.colors.pointStroke;
+    ctx.strokeStyle = selected ? this.colors.pointSelectedStroke : this.colors.pointStroke;
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    if (selected) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, POINT_RADIUS + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = this.colors.pointSelected;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 2]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   drawLine(a: Point, b: Point, preview = false) {
@@ -228,30 +244,25 @@ export class Renderer {
     ctx.fillText(text, pos.x + offset.x, pos.y + offset.y);
   }
 
-  drawMeasurement(m: Measurement, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null, hideLabels = false) {
+  drawMeasurement(m: Measurement, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null, hideLabels = false, selectedPointIdx: number | null = null) {
     switch (m.kind) {
       case "polyline":
-        this.drawPolylineMeasurement(m.start, m.segments, !!m.closed, cal, unit, mousePos, hoveredPointIdx, hideLabels);
+        this.drawPolylineMeasurement(m.start, m.segments, !!m.closed, cal, unit, mousePos, hoveredPointIdx, hideLabels, selectedPointIdx);
         break;
       case "rectangle":
-        this.drawRectangleMeasurement(m.points[0], m.points[1], cal, unit, hoveredPointIdx, hideLabels);
+        this.drawRectangleMeasurement(m.points[0], m.points[1], cal, unit, hoveredPointIdx, hideLabels, selectedPointIdx);
         break;
       case "circle":
-        this.drawCircleMeasurement(m.center, m.radiusPx, cal, unit, hoveredPointIdx, hideLabels);
+        this.drawCircleMeasurement(m.center, m.radiusPx, cal, unit, hoveredPointIdx, hideLabels, selectedPointIdx);
         break;
     }
   }
 
-  /**
-   * Draw a circular arc through 3 points (start, mid, end).
-   * The "mid" point lies on the arc between start and end.
-   */
   drawArc(start: Point, mid: Point, end: Point, preview = false) {
     const ctx = this.ctx;
     const circle = circumscribedCircle(start, mid, end);
 
     if (!circle) {
-      // Collinear: just draw a straight line
       this.drawLine(start, end, preview);
       return;
     }
@@ -271,7 +282,7 @@ export class Renderer {
     ctx.setLineDash([]);
   }
 
-  drawPolylineMeasurement(start: Point, segments: PolylineSegment[], closed: boolean, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null, hideLabels = false) {
+  drawPolylineMeasurement(start: Point, segments: PolylineSegment[], closed: boolean, cal: Calibration | null, unit: Unit, mousePos: Point | null, hoveredPointIdx: number | null, hideLabels = false, selectedPointIdx: number | null = null) {
     const ctx = this.ctx;
 
     // Draw fill if closed
@@ -304,7 +315,7 @@ export class Renderer {
     let pointIdx = 0;
 
     // Draw start point
-    this.drawPoint(start, hoveredPointIdx === pointIdx);
+    this.drawPoint(start, hoveredPointIdx === pointIdx, selectedPointIdx === pointIdx);
     pointIdx++;
 
     let prev = start;
@@ -318,8 +329,8 @@ export class Renderer {
           const mid = midpoint(prev, seg.end);
           this.drawLabel(formatValue(len, unit), mid, { x: 0, y: -20 });
         }
-        // Draw bulge control point (smaller, different style)
-        this.drawBulgePoint(seg.bulge, hoveredPointIdx === pointIdx);
+        // Draw bulge control point
+        this.drawBulgePoint(seg.bulge, hoveredPointIdx === pointIdx, selectedPointIdx === pointIdx);
         pointIdx++;
       } else {
         // Straight segment
@@ -334,7 +345,7 @@ export class Renderer {
       const isClosingDup = closed && i === segments.length - 1
         && (seg.end.x - start.x) ** 2 + (seg.end.y - start.y) ** 2 < 0.25;
       if (!isClosingDup) {
-        this.drawPoint(seg.end, hoveredPointIdx === pointIdx);
+        this.drawPoint(seg.end, hoveredPointIdx === pointIdx, selectedPointIdx === pointIdx);
       }
       pointIdx++;
       prev = seg.end;
@@ -365,20 +376,29 @@ export class Renderer {
     }
   }
 
-  drawBulgePoint(p: Point, hovered = false) {
+  drawBulgePoint(p: Point, hovered = false, selected = false) {
     const ctx = this.ctx;
     ctx.beginPath();
     ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = hovered ? this.colors.bulgeHover : this.colors.bulge;
+    ctx.fillStyle = selected ? this.colors.pointSelected : hovered ? this.colors.bulgeHover : this.colors.bulge;
     ctx.fill();
-    ctx.strokeStyle = this.colors.bulgeStroke;
+    ctx.strokeStyle = selected ? this.colors.pointSelectedStroke : this.colors.bulgeStroke;
     ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    if (selected) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+      ctx.strokeStyle = this.colors.pointSelected;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 2]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   drawCloseSnapRing(p: Point) {
     const ctx = this.ctx;
-    // Outer pulsing ring
     ctx.beginPath();
     ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
     ctx.strokeStyle = this.colors.closeSnapRing;
@@ -386,7 +406,6 @@ export class Renderer {
     ctx.setLineDash([4, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
-    // Label
     ctx.font = "10px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = this.colors.closeSnapText;
     ctx.textAlign = "left";
@@ -402,7 +421,6 @@ export class Renderer {
       ? this.colors.snapTangent
       : this.colors.snapPerpendicular;
 
-    // Draw dashed guide line extending in both directions
     const x1 = from.x - direction.x * extent;
     const y1 = from.y - direction.y * extent;
     const x2 = from.x + direction.x * extent;
@@ -417,7 +435,6 @@ export class Renderer {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw label near the from point
     const labelX = from.x + 12;
     const labelY = from.y - 12;
     ctx.font = "10px 'Segoe UI', system-ui, sans-serif";
@@ -441,43 +458,37 @@ export class Renderer {
     ctx.setLineDash([]);
   }
 
-  drawRectangleMeasurement(a: Point, b: Point, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null, hideLabels = false) {
+  drawRectangleMeasurement(a: Point, b: Point, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null, hideLabels = false, selectedPointIdx: number | null = null) {
     const ctx = this.ctx;
     const x = Math.min(a.x, b.x);
     const y = Math.min(a.y, b.y);
     const w = Math.abs(b.x - a.x);
     const h = Math.abs(b.y - a.y);
 
-    // Fill
     ctx.fillStyle = this.colors.shapeFill;
     ctx.fillRect(x, y, w, h);
 
-    // Stroke
     ctx.strokeStyle = this.colors.line;
     ctx.lineWidth = LINE_WIDTH;
     ctx.strokeRect(x, y, w, h);
 
     if (!hideLabels) {
-      // Width label (top)
       const topMid: Point = { x: x + w / 2, y };
       const wVal = distToUnit({ x: a.x, y: 0 }, { x: b.x, y: 0 }, cal, unit);
       this.drawLabel(formatValue(wVal, unit), topMid, { x: 0, y: -18 });
 
-      // Height label (right)
       const rightMid: Point = { x: x + w, y: y + h / 2 };
       const hVal = distToUnit({ x: 0, y: a.y }, { x: 0, y: b.y }, cal, unit);
       this.drawLabel(formatValue(hVal, unit), rightMid, { x: 24, y: 0 });
     }
 
-    // Corner points
-    this.drawPoint(a, hoveredPointIdx === 0);
-    this.drawPoint(b, hoveredPointIdx === 1);
+    this.drawPoint(a, hoveredPointIdx === 0, selectedPointIdx === 0);
+    this.drawPoint(b, hoveredPointIdx === 1, selectedPointIdx === 1);
   }
 
-  drawCircleMeasurement(center: Point, radiusPx: number, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null, hideLabels = false) {
+  drawCircleMeasurement(center: Point, radiusPx: number, cal: Calibration | null, unit: Unit, hoveredPointIdx: number | null, hideLabels = false, selectedPointIdx: number | null = null) {
     const ctx = this.ctx;
 
-    // Fill
     ctx.beginPath();
     ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
     ctx.fillStyle = this.colors.shapeFill;
@@ -486,28 +497,23 @@ export class Renderer {
     ctx.lineWidth = LINE_WIDTH;
     ctx.stroke();
 
-    // Radius line
     const edgePoint: Point = { x: center.x + radiusPx, y: center.y };
     this.drawLine(center, edgePoint);
 
     if (!hideLabels) {
-      // Radius label
       const rVal = pxToUnit(radiusPx, cal, unit);
       const mid = midpoint(center, edgePoint);
       this.drawLabel("r = " + formatValue(rVal, unit), mid, { x: 0, y: -20 });
-
-      // Diameter label
       this.drawLabel("d = " + formatValue(rVal * 2, unit), center, { x: 0, y: 20 });
     }
 
-    // Center point and edge point (both draggable)
-    this.drawPoint(center, hoveredPointIdx === 0);
-    this.drawPoint(edgePoint, hoveredPointIdx === 1);
+    this.drawPoint(center, hoveredPointIdx === 0, selectedPointIdx === 0);
+    this.drawPoint(edgePoint, hoveredPointIdx === 1, selectedPointIdx === 1);
   }
+
 
   drawCalibrationRect(x: number, y: number, widthPx: number, heightPx: number) {
     const ctx = this.ctx;
-    // ISO 7810 credit card corner radius: 3.18mm on an 85.6mm wide card
     const cornerRadiusPx = 3.18 * (widthPx / 85.6);
 
     ctx.fillStyle = this.colors.calFill;
@@ -523,7 +529,6 @@ export class Renderer {
   }
 
   drawCalibrationUI(widthPx: number, heightPx: number, corner: "left" | "right"): { x: number; y: number; buttons: Array<{ rect: { x: number; y: number; w: number; h: number }; action: string }> } {
-    // Position at bottom-left or bottom-right using screen frame as guide
     const padding = 0;
     const x = corner === "left" ? padding : this.width - widthPx - padding;
     const y = this.height - heightPx - padding;
@@ -533,11 +538,9 @@ export class Renderer {
     const ctx = this.ctx;
     const buttons: Array<{ rect: { x: number; y: number; w: number; h: number }; action: string }> = [];
 
-    // --- Instructions: positioned near the calibration rectangle ---
-    // Align text based on which corner the rect is in to avoid off-screen overflow
     const textAlign: CanvasTextAlign = corner === "left" ? "left" : "right";
     const textX = corner === "left" ? Math.max(x, 16) : Math.min(x + widthPx, this.width - 16);
-    const textBaseY = Math.max(80, y - 100); // ensure text stays within screen bounds
+    const textBaseY = Math.max(80, y - 100);
 
     ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = this.colors.calTitle;
@@ -554,28 +557,23 @@ export class Renderer {
     ctx.textAlign = textAlign;
     ctx.fillText("[TAB] switch corner \u00B7 [\u23CE Enter] confirm \u00B7 [Esc] cancel", textX, textBaseY + 62);
 
-    // Show current dimensions
     ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = this.colors.calDim;
     ctx.textAlign = textAlign;
     ctx.fillText(`${widthPx.toFixed(1)} \u00D7 ${heightPx.toFixed(1)} px`, textX, textBaseY + 82);
 
-    // --- Draw on-screen calibration buttons ---
-    // Compact layout: [<<] [<] Label [>] [>>] per row
     const arrowBtnW = 32;
     const arrowBtnH = 26;
     const labelW = 100;
     const btnGap = 4;
     const rowH = arrowBtnH + btnGap;
 
-    // Total row width: 4 arrow buttons + label + gaps
     const panelW = arrowBtnW * 4 + labelW + btnGap * 4;
     const panelX = corner === "left"
       ? Math.max(x + widthPx + 40, this.width / 2 - panelW / 2)
       : Math.min(x - 40 - panelW, this.width / 2 - panelW / 2);
     const panelY = this.height - 240;
 
-    // Helper to draw a small button and register its hit area
     const drawBtn = (bx: number, by: number, bw: number, bh: number, label: string, action: string, color: string, textColor: string, rotation = 0) => {
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -604,19 +602,15 @@ export class Renderer {
       buttons.push({ rect: { x: bx, y: by, w: bw, h: bh }, action });
     };
 
-    // Helper to draw a compact arrow row: [<<] [<] Label [>] [>>]
     const drawArrowRow = (rowY: number, label: string, actions: { coarseMinus: string; fineMinus: string; finePlus: string; coarsePlus: string }, rotation = 0) => {
       let cx = panelX;
 
-      // [<<] coarse minus
       drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u00AB", actions.coarseMinus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
       cx += arrowBtnW + btnGap;
 
-      // [<] fine minus
       drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u2039", actions.fineMinus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
       cx += arrowBtnW + btnGap;
 
-      // Center label
       ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
       ctx.fillStyle = this.colors.calBtnLabel;
       ctx.textAlign = "center";
@@ -624,15 +618,12 @@ export class Renderer {
       ctx.fillText(label, cx + labelW / 2, rowY + arrowBtnH / 2);
       cx += labelW + btnGap;
 
-      // [>] fine plus
       drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u203A", actions.finePlus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
       cx += arrowBtnW + btnGap;
 
-      // [>>] coarse plus
       drawBtn(cx, rowY, arrowBtnW, arrowBtnH, "\u00BB", actions.coarsePlus, this.colors.calBtnBg, this.colors.calBtnText, rotation);
     };
 
-    // Row 1: Width  [«] [‹] Width [›] [»]
     let rowY = panelY;
     drawArrowRow(rowY, "Width", {
       coarseMinus: "width-",
@@ -641,7 +632,6 @@ export class Renderer {
       coarsePlus: "width+",
     });
 
-    // Row 2: Height — same «‹›» symbols rotated -90° (CCW → pointing up/down)
     rowY += rowH + 2;
     drawArrowRow(rowY, "Height", {
       coarseMinus: "height-",
@@ -650,11 +640,9 @@ export class Renderer {
       coarsePlus: "height+",
     }, -Math.PI / 2);
 
-    // Row 3: Switch Corner (full width)
     rowY += rowH + 8;
     drawBtn(panelX, rowY, panelW, arrowBtnH, "Switch Corner", "switch-corner", this.colors.calCornerBg, this.colors.calCornerText);
 
-    // Row 4: Confirm / Cancel
     rowY += arrowBtnH + btnGap;
     const halfW = (panelW - btnGap) / 2;
     drawBtn(panelX, rowY, halfW, arrowBtnH, "Confirm", "confirm", this.colors.calConfirmBg, this.colors.calConfirmText);

@@ -1,8 +1,10 @@
 import type { Point, Measurement, ToolType, Unit, Calibration, PolylineMeasurement } from "./types";
 import type { Tool, ToolContext, ToolActions, ToolDrawState } from "./tool";
-import { pointNear, screenToWorld } from "./utils";
+import { dist, pointNear, screenToWorld } from "./utils";
 import { POINT_HIT_RADIUS, CLOSE_SNAP_RADIUS } from "./polyline-arc";
 import { saveMeasurements } from "./storage";
+
+const DRAG_THRESHOLD = 3;
 
 export class ToolManager {
   // --- Shared state ---
@@ -27,6 +29,16 @@ export class ToolManager {
   // Hover state (visual feedback on completed measurement points)
   hoveredMeasurementId: string | null = null;
   hoveredPointIdx: number | null = null;
+
+  // Selection state (cross-tool: click-to-select, arrow-nudge, Tab-cycle)
+  selectedMeasurementId: string | null = null;
+  selectedPointIdx: number | null = null;
+  nudgeHideLabelsUntil = 0;
+  private dragPending = false;
+  private dragStartPos: Point | null = null;
+
+  // Persistence version (incremented on every measurement mutation)
+  saveVersion = 0;
 
   // Tools
   private tools: Map<ToolType, Tool> = new Map();
@@ -55,8 +67,20 @@ export class ToolManager {
       const actions = this._activeTool.onDeactivate(this.getContext());
       this.processActions(actions);
     }
+    this.clearSelection();
     this._activeTool = this.tools.get(type)!;
     this._activeTool.onActivate(this.getContext());
+  }
+
+  clearSelection() {
+    this.selectedMeasurementId = null;
+    this.selectedPointIdx = null;
+  }
+
+  /** Save measurements to localStorage and bump version for URL sync */
+  private persistMeasurements() {
+    saveMeasurements(this.measurements);
+    this.saveVersion++;
   }
 
   get activeTool(): Tool {
@@ -82,7 +106,7 @@ export class ToolManager {
   processActions(actions: ToolActions) {
     if (actions.completeMeasurement) {
       this.measurements.push(actions.completeMeasurement);
-      saveMeasurements(this.measurements);
+      this.persistMeasurements();
     }
     if (actions.setCalibration) {
       this.calibration = actions.setCalibration;
@@ -96,6 +120,14 @@ export class ToolManager {
   handleMouseMove(screenPos: Point): void {
     if (this.isPanning) return;
     this.mousePos = screenToWorld(screenPos, this.panX, this.panY);
+
+    // Promote pending drag after threshold
+    if (this.dragPending && !this.isDragging && this.dragStartPos) {
+      if (dist(screenPos, this.dragStartPos) > DRAG_THRESHOLD) {
+        this.isDragging = true;
+        this.dragPending = false;
+      }
+    }
 
     if (this.isDragging && this.dragInfo) {
       const m = this.measurements.find((m) => m.id === this.dragInfo!.measurementId);
@@ -125,7 +157,7 @@ export class ToolManager {
           }
         }
 
-        saveMeasurements(this.measurements);
+        this.persistMeasurements();
       }
       return;
     }
@@ -157,9 +189,12 @@ export class ToolManager {
       const hit = findHoveredPoint(this.measurements, pos);
       if (hit) {
         this.dragInfo = hit;
-        this.isDragging = true;
+        this.dragPending = true;
+        this.dragStartPos = screenPos;
         return true;
       }
+      // Clicked on empty space — clear selection
+      this.clearSelection();
     }
 
     const actions = this._activeTool.onClick(pos, this.getContext());
@@ -168,6 +203,16 @@ export class ToolManager {
   }
 
   handleMouseUp(screenPos: Point): void {
+    // Non-drag click on a point → select it
+    if (this.dragPending && !this.isDragging && this.dragInfo) {
+      this.selectedMeasurementId = this.dragInfo.measurementId;
+      this.selectedPointIdx = this.dragInfo.pointIndex;
+      this.dragPending = false;
+      this.dragStartPos = null;
+      this.dragInfo = null;
+      return;
+    }
+
     if (this.isDragging) {
       if (this.dragInfo) {
         const m = this.measurements.find((m) => m.id === this.dragInfo!.measurementId);
@@ -182,10 +227,12 @@ export class ToolManager {
               m.segments[m.segments.length - 1]!.end = { ...m.start };
             }
           }
-          saveMeasurements(this.measurements);
+          this.persistMeasurements();
         }
       }
       this.isDragging = false;
+      this.dragPending = false;
+      this.dragStartPos = null;
       this.dragInfo = null;
       this.dragCloseSnapPoint = null;
       return;
@@ -208,7 +255,7 @@ export class ToolManager {
           if (m.segments.length === 0) {
             this.measurements.splice(mIdx, 1);
           }
-          saveMeasurements(this.measurements);
+          this.persistMeasurements();
           this.hoveredMeasurementId = null;
           this.hoveredPointIdx = null;
           return;
@@ -220,7 +267,53 @@ export class ToolManager {
     this.processActions(actions);
   }
 
+  /** Get the world-space position of the currently selected point, or null */
+  getSelectedPointPos(): Point | null {
+    if (this.selectedMeasurementId === null || this.selectedPointIdx === null) return null;
+    const m = this.measurements.find((m) => m.id === this.selectedMeasurementId);
+    if (!m) return null;
+    const pts = getMeasurementPoints(m);
+    return pts[this.selectedPointIdx] ?? null;
+  }
+
   handleKeyDown(key: string, shiftKey: boolean): ToolActions | null {
+    // Selection: arrow nudge, Tab cycle, Escape deselect
+    if (this.selectedMeasurementId !== null && this.selectedPointIdx !== null) {
+      const delta = getArrowDelta(key);
+      if (delta) {
+        const m = this.measurements.find((m) => m.id === this.selectedMeasurementId);
+        if (m) {
+          const pts = getMeasurementPoints(m);
+          const cur = pts[this.selectedPointIdx!];
+          if (cur) {
+            setMeasurementPoint(m, this.selectedPointIdx!, { x: cur.x + delta.x, y: cur.y + delta.y });
+            this.persistMeasurements();
+            this.nudgeHideLabelsUntil = Date.now() + 1500;
+          }
+        }
+        return {};
+      }
+      if (key === "Tab") {
+        const m = this.measurements.find((m) => m.id === this.selectedMeasurementId);
+        if (m) {
+          const pts = getMeasurementPoints(m);
+          this.selectedPointIdx = (this.selectedPointIdx! + 1) % pts.length;
+        }
+        return {};
+      }
+      if (key === "Escape" && !this._activeTool.hasActiveMeasurement()) {
+        this.clearSelection();
+        return {};
+      }
+      // Delete selected measurement
+      if (key === "Delete" || key === "Backspace") {
+        this.measurements = this.measurements.filter((m) => m.id !== this.selectedMeasurementId);
+        this.persistMeasurements();
+        this.clearSelection();
+        return {};
+      }
+    }
+
     // Delete/Backspace: tool-specific or delete hovered measurement
     if (key === "Delete" || key === "Backspace") {
       const actions = this._activeTool.onKeyDown(key, shiftKey, this.getContext());
@@ -231,7 +324,7 @@ export class ToolManager {
       // Fallback: delete hovered measurement
       if (this.hoveredMeasurementId) {
         this.measurements = this.measurements.filter((m) => m.id !== this.hoveredMeasurementId);
-        saveMeasurements(this.measurements);
+        this.persistMeasurements();
         this.hoveredMeasurementId = null;
         this.hoveredPointIdx = null;
         return {};
@@ -252,6 +345,10 @@ export class ToolManager {
   }
 
   getHelpHint(): string {
+    // Selection hint overrides tool base hint
+    if (this.selectedMeasurementId !== null) {
+      return "<kbd>←→↑↓</kbd> nudge 0.5px · <kbd>Tab</kbd> next point · <kbd>Esc</kbd> deselect";
+    }
     const base = this._activeTool.getHelpHint(this.getContext());
     const drawState = this.getDrawState();
     // Cross-cutting snap hint
@@ -264,10 +361,22 @@ export class ToolManager {
   // --- Clear all ---
   clearAll() {
     this.measurements = [];
+    this.saveVersion++;
+    this.clearSelection();
     // Deactivate and reactivate to reset tool state
-    const toolName = this._activeTool.name;
     this._activeTool.onDeactivate(this.getContext());
     this._activeTool.onActivate(this.getContext());
+  }
+}
+
+// --- Arrow key delta for nudge (cross-tool concern) ---
+function getArrowDelta(key: string): Point | null {
+  switch (key) {
+    case "ArrowLeft": return { x: -0.5, y: 0 };
+    case "ArrowRight": return { x: 0.5, y: 0 };
+    case "ArrowUp": return { x: 0, y: -0.5 };
+    case "ArrowDown": return { x: 0, y: 0.5 };
+    default: return null;
   }
 }
 

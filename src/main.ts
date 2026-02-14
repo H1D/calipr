@@ -1,9 +1,10 @@
 import type { ToolType, Unit } from "./types";
 import { detectDefaultUnit } from "./utils";
 import { Renderer } from "./renderer";
-import { loadCalibration, loadMeasurements, clearStorage, savePan, loadPan } from "./storage";
+import { loadCalibration, loadMeasurements, clearStorage, savePan, loadPan, saveMeasurements } from "./storage";
 import { PRESETS, loadPresetIndex, savePresetIndex, getShortcutLabel, toolForKey } from "./keybindings";
 import { exportSVG, downloadSVG } from "./export-svg";
+import { loadFromHash, setHash } from "./share";
 import { ToolManager } from "./tool-manager";
 import { CalibrateTool } from "./tools/calibrate-tool";
 import { RectangleTool } from "./tools/rectangle-tool";
@@ -45,7 +46,8 @@ const settingsBtn = document.getElementById("settings-btn")!;
 const settingsPanel = document.getElementById("settings-panel")!;
 const keybindingSelect = document.getElementById("keybinding-select") as HTMLSelectElement;
 const exportSvgBtn = document.getElementById("export-svg-btn")!;
-const zoomToast = document.getElementById("zoom-toast")!;
+const shareLinkBtn = document.getElementById("share-link-btn")!;
+const toastEl = document.getElementById("zoom-toast")!;
 const themeSelector = document.getElementById("theme-selector")!;
 
 // --- Theme ---
@@ -92,6 +94,22 @@ darkMQ.addEventListener("change", () => {
 let presetIndex = loadPresetIndex();
 let currentPreset = PRESETS[presetIndex]!;
 
+// --- Debounced URL hash sync ---
+let lastSyncedVersion = manager.saveVersion;
+let hashDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
+let hashUpdateInFlight = false;
+
+// --- URL decode on page load ---
+(async () => {
+  const shared = await loadFromHash();
+  if (shared) {
+    manager.measurements.splice(0, manager.measurements.length, ...shared);
+    saveMeasurements(manager.measurements);
+    // Sync version so the draw loop doesn't immediately re-encode
+    lastSyncedVersion = manager.saveVersion;
+  }
+})();
+
 // --- Initialize ---
 applyTheme();
 updateThemeUI();
@@ -103,8 +121,33 @@ updateUnitUI();
 updateShortcutLabels();
 requestAnimationFrame(draw);
 
+function scheduleHashSync() {
+  // Throttle: if a timer or async op is already in progress, let it finish
+  if (hashUpdateInFlight || hashDebounceTimeout) return;
+  hashDebounceTimeout = setTimeout(async () => {
+    hashDebounceTimeout = null;
+    hashUpdateInFlight = true;
+    try {
+      if (manager.measurements.length > 0) {
+        await setHash(manager.measurements);
+      } else {
+        history.replaceState(null, "", location.pathname);
+      }
+    } catch {
+      // Silently fail — URL sync is best-effort
+    }
+    hashUpdateInFlight = false;
+    lastSyncedVersion = manager.saveVersion;
+  }, 300);
+}
+
 // --- Drawing Loop ---
 function draw() {
+  // Auto-sync URL hash when measurements change
+  if (manager.saveVersion !== lastSyncedVersion) {
+    scheduleHashSync();
+  }
+
   updateHelpHint();
   renderer.clear();
   renderer.drawGrid();
@@ -122,20 +165,24 @@ function draw() {
     const calTool = manager.activeTool as CalibrateTool;
     calTool.calButtons = calResult.buttons;
   } else {
-    // Alignment crosshair during creation or drag
+    const hideLabels = manager.isDragging || Date.now() < manager.nudgeHideLabelsUntil || manager.calibration === null;
+
+    // Alignment crosshair during creation, drag, or selected point
+    const selectedPos = manager.getSelectedPointPos();
     const crosshairPos = manager.isDragging
       ? manager.mousePos
       : drawState.activeMeasurement
         ? (drawState.effectiveMousePos ?? manager.mousePos)
-        : null;
+        : selectedPos;
     if (crosshairPos) {
       renderer.drawCrosshair(crosshairPos);
     }
 
-    // Draw completed measurements
+    // Draw completed measurements (labels hidden until calibrated)
     for (const m of manager.measurements) {
       const hIdx = manager.hoveredMeasurementId === m.id ? manager.hoveredPointIdx : null;
-      renderer.drawMeasurement(m, manager.calibration, manager.unit, null, hIdx, manager.isDragging);
+      const sIdx = manager.selectedMeasurementId === m.id ? manager.selectedPointIdx : null;
+      renderer.drawMeasurement(m, manager.calibration, manager.unit, null, hIdx, hideLabels, sIdx);
     }
 
     // Draw close snap ring during drag (editing completed measurement)
@@ -145,7 +192,7 @@ function draw() {
 
     // Draw active measurement
     if (drawState.activeMeasurement) {
-      renderer.drawMeasurement(drawState.activeMeasurement, manager.calibration, manager.unit, drawState.effectiveMousePos, null, manager.isDragging);
+      renderer.drawMeasurement(drawState.activeMeasurement, manager.calibration, manager.unit, drawState.effectiveMousePos, null, hideLabels);
 
       if (drawState.closeSnapRing) {
         renderer.drawCloseSnapRing(drawState.closeSnapRing);
@@ -192,7 +239,7 @@ function updateUnitUI() {
 function updateCalibrateButtonFlash() {
   const btn = toolbar.querySelector('.tool-btn[data-tool="calibrate"]') as HTMLElement | null;
   if (!btn) return;
-  if (manager.calibration === null && manager.measurements.length > 0 && manager.activeToolName !== "calibrate") {
+  if (manager.calibration === null && manager.activeToolName !== "calibrate") {
     btn.classList.add("flash-calibrate");
   } else {
     btn.classList.remove("flash-calibrate");
@@ -240,7 +287,7 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  const consumed = manager.handleMouseDown({ x: e.clientX, y: e.clientY });
+  manager.handleMouseDown({ x: e.clientX, y: e.clientY });
   if (manager.isDragging) {
     canvas.style.cursor = "grabbing";
   }
@@ -271,8 +318,8 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  // Calibrate tool needs preventDefault for arrow keys/tab/enter/escape
-  if (manager.activeToolName === "calibrate") {
+  // Prevent default for arrow keys/tab when selected point or calibrate tool active
+  if (manager.selectedMeasurementId !== null || manager.activeToolName === "calibrate") {
     if (["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Tab", "Enter", "Escape"].includes(e.key)) {
       e.preventDefault();
     }
@@ -353,6 +400,20 @@ function initSettingsPanel() {
   exportSvgBtn.addEventListener("click", () => {
     const svg = exportSVG(manager.measurements, manager.calibration, manager.unit);
     downloadSVG(svg, "ruler-measurements.svg");
+  });
+
+  shareLinkBtn.addEventListener("click", async () => {
+    if (manager.measurements.length === 0) {
+      showToast("Nothing to share — draw some measurements first");
+      return;
+    }
+    // URL hash is auto-synced; just copy current URL to clipboard
+    try {
+      await navigator.clipboard.writeText(location.href);
+      showToast("Link copied to clipboard");
+    } catch {
+      showToast("Copy the URL from your address bar to share");
+    }
   });
 
   themeSelector.addEventListener("click", (e) => {
@@ -443,19 +504,25 @@ document.addEventListener("keyup", (e) => {
   }
 });
 
-// --- Zoom prevention ---
-let zoomToastTimeout: ReturnType<typeof setTimeout> | null = null;
+// --- Toast ---
+let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
+function showToast(msg: string, duration = 2000) {
+  toastEl.textContent = msg;
+  if (!toastTimeout) {
+    toastEl.classList.add("visible");
+  }
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toastEl.classList.remove("visible");
+    toastTimeout = null;
+  }, duration);
+}
+
+// --- Zoom prevention ---
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
-  if (!zoomToastTimeout) {
-    zoomToast.classList.add("visible");
-  }
-  if (zoomToastTimeout) clearTimeout(zoomToastTimeout);
-  zoomToastTimeout = setTimeout(() => {
-    zoomToast.classList.remove("visible");
-    zoomToastTimeout = null;
-  }, 2000);
+  showToast("Zoom is disabled by design — it would compromise measurement accuracy");
 }, { passive: false });
 
 // --- Resize ---

@@ -1,0 +1,38 @@
+# Tool System Documentation
+
+pattern: Strategy
+interface_file: src/tool.ts
+manager_file: src/tool-manager.ts
+
+event_flow: DOM event -> main.ts -> ToolManager.handle*() -> activeTool.on*() -> ToolActions -> ToolManager.processActions()
+action_types: completeMeasurement (adds to array); setCalibration (updates calibration); switchTool (changes active tool)
+
+tools[4]{name,file,complexity,notes}:
+  LineTool,src/tools/line-tool.ts,high,Polyline with arcs; hold-to-drag gesture; tangent/perp snap; close detection; computeSnap() lives here (~300 lines)
+  RectangleTool,src/tools/rectangle-tool.ts,low,Two-click corner flow (~75 lines)
+  CircleTool,src/tools/circle-tool.ts,low,Two-click center+edge flow (~75 lines)
+  CalibrateTool,src/tools/calibrate-tool.ts,medium,Credit card overlay; screen coords (not world) for button hit-testing; keyboard/button controls
+
+cross_tool_concerns[8]{concern,handler}:
+  Dragging completed measurement points,ToolManager (deferred drag with 3px threshold)
+  Hover detection on completed points,ToolManager
+  Double-click to remove polyline points,ToolManager
+  Delete/Backspace to remove hovered measurement,ToolManager (fallback when tool returns null)
+  Snap hint suffix in help text,ToolManager
+  Selection (click-to-select; arrow-nudge 0.5px; Tab cycle; Escape deselect),ToolManager
+  Calibration gate (hide measurements until calibrated),main.ts draw loop + renderer.drawCalibrationGate()
+  Help hint priority system,ToolManager.getHelpHint(): selection hint > tool base hint > snap suffix
+
+help_hint_system:
+  element: "#help-hint (fixed bottom-center, above toolbar)"
+  architecture: "Tool.getHelpHint() → ToolManager layers cross-tool overrides → main.ts renders"
+  priority: "selection hint > tool base hint > snap suffix"
+  pattern: "Every interaction state should have a discoverable hint"
+
+# Polyline Arc System
+
+arc_file: src/polyline-arc.ts
+arc_storage: Segments have optional bulge points defining circular arcs through three points (start; bulge; end)
+arc_gesture: Click adds straight segment; holding 200ms+ switches to arc mode; dragging shapes curve
+arc_constraint: Arcs are tangent-constrained to previous segment for smooth continuity
+arc_close: Close detection snaps last endpoint to polyline start when near; recomputes bulge for snapped arc

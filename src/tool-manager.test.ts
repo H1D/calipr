@@ -87,8 +87,12 @@ describe("ToolManager", () => {
       });
       // Click right on the first point (50,50) — no pan offset
       mgr.handleMouseDown({ x: 50, y: 50 });
-      expect(mgr.isDragging).toBe(true);
+      // Deferred drag: dragInfo set but isDragging not yet true
       expect(mgr.dragInfo).toEqual({ measurementId: "rect-1", pointIndex: 0 });
+      expect(mgr.isDragging).toBe(false);
+      // Move past 3px threshold to promote to drag
+      mgr.handleMouseMove({ x: 54, y: 50 });
+      expect(mgr.isDragging).toBe(true);
     });
 
     test("drag updates point position on mouse move", () => {
@@ -117,8 +121,7 @@ describe("ToolManager", () => {
       });
       // Start drag on the last endpoint (100,100) — pointIndex 2
       mgr.handleMouseDown({ x: 100, y: 100 });
-      expect(mgr.isDragging).toBe(true);
-      // Drag near start (0,0)
+      // Drag near start (0,0) — distance exceeds threshold, promotes to drag
       mgr.handleMouseMove({ x: 5, y: 5 });
       const poly = mgr.measurements[0]! as PolylineMeasurement;
       // Last endpoint should snap to start
@@ -139,8 +142,7 @@ describe("ToolManager", () => {
       });
       // Start drag on start point (0,0) — pointIndex 0
       mgr.handleMouseDown({ x: 0, y: 0 });
-      expect(mgr.isDragging).toBe(true);
-      // Drag near last endpoint (100,100)
+      // Drag near last endpoint (100,100) — distance exceeds threshold, promotes to drag
       mgr.handleMouseMove({ x: 95, y: 95 });
       const poly = mgr.measurements[0]! as PolylineMeasurement;
       // Start should snap to last endpoint
@@ -276,6 +278,266 @@ describe("ToolManager", () => {
       });
       mgr.clearAll();
       expect(mgr.measurements).toHaveLength(0);
+    });
+
+    test("bumps saveVersion", () => {
+      const mgr = createManager();
+      const before = mgr.saveVersion;
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "rect-1",
+        points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+      });
+      mgr.clearAll();
+      expect(mgr.saveVersion).toBeGreaterThan(before);
+    });
+  });
+
+  describe("selection", () => {
+    function managerWithRect() {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "rect-1",
+        points: [{ x: 50, y: 50 }, { x: 150, y: 150 }],
+      });
+      return mgr;
+    }
+
+    function managerWithTriangle() {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "polyline",
+        id: "poly-1",
+        start: { x: 0, y: 0 },
+        segments: [
+          { end: { x: 100, y: 0 } },
+          { end: { x: 50, y: 80 } },
+        ],
+      });
+      return mgr;
+    }
+
+    test("click on point selects it (mouseDown + mouseUp below threshold)", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      expect(mgr.selectedMeasurementId).toBe("rect-1");
+      expect(mgr.selectedPointIdx).toBe(0);
+    });
+
+    test("click on empty space clears selection", () => {
+      const mgr = managerWithRect();
+      // Select first
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      expect(mgr.selectedMeasurementId).toBe("rect-1");
+      // Click empty space
+      mgr.handleMouseDown({ x: 500, y: 500 });
+      expect(mgr.selectedMeasurementId).toBeNull();
+      expect(mgr.selectedPointIdx).toBeNull();
+    });
+
+    test("drag past threshold does NOT select", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseMove({ x: 70, y: 80 }); // > 3px threshold
+      mgr.handleMouseUp({ x: 70, y: 80 });
+      expect(mgr.selectedMeasurementId).toBeNull();
+    });
+
+    test("switching tools clears selection", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      expect(mgr.selectedMeasurementId).toBe("rect-1");
+      mgr.setActiveTool("circle");
+      expect(mgr.selectedMeasurementId).toBeNull();
+    });
+
+    test("getSelectedPointPos returns point coords when selected", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      expect(mgr.getSelectedPointPos()).toEqual({ x: 50, y: 50 });
+    });
+
+    test("getSelectedPointPos returns null when nothing selected", () => {
+      const mgr = managerWithRect();
+      expect(mgr.getSelectedPointPos()).toBeNull();
+    });
+
+    test("ArrowRight nudges +0.5 in x", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleKeyDown("ArrowRight", false);
+      const rect = mgr.measurements[0]! as RectangleMeasurement;
+      expect(rect.points[0]).toEqual({ x: 50.5, y: 50 });
+    });
+
+    test("ArrowLeft nudges -0.5 in x", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleKeyDown("ArrowLeft", false);
+      const rect = mgr.measurements[0]! as RectangleMeasurement;
+      expect(rect.points[0]).toEqual({ x: 49.5, y: 50 });
+    });
+
+    test("ArrowUp nudges -0.5 in y", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleKeyDown("ArrowUp", false);
+      const rect = mgr.measurements[0]! as RectangleMeasurement;
+      expect(rect.points[0]).toEqual({ x: 50, y: 49.5 });
+    });
+
+    test("ArrowDown nudges +0.5 in y", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleKeyDown("ArrowDown", false);
+      const rect = mgr.measurements[0]! as RectangleMeasurement;
+      expect(rect.points[0]).toEqual({ x: 50, y: 50.5 });
+    });
+
+    test("nudge sets nudgeHideLabelsUntil", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleKeyDown("ArrowRight", false);
+      expect(mgr.nudgeHideLabelsUntil).toBeGreaterThan(Date.now());
+    });
+
+    test("nudge bumps saveVersion", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      const before = mgr.saveVersion;
+      mgr.handleKeyDown("ArrowRight", false);
+      expect(mgr.saveVersion).toBeGreaterThan(before);
+    });
+
+    test("arrow keys do nothing without selection", () => {
+      const mgr = managerWithRect();
+      const result = mgr.handleKeyDown("ArrowRight", false);
+      const rect = mgr.measurements[0]! as RectangleMeasurement;
+      expect(rect.points[0]).toEqual({ x: 50, y: 50 });
+      expect(result).toBeNull();
+    });
+
+    test("Tab cycles to next point", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      expect(mgr.selectedPointIdx).toBe(0);
+      mgr.handleKeyDown("Tab", false);
+      expect(mgr.selectedPointIdx).toBe(1);
+    });
+
+    test("Tab wraps around to first point", () => {
+      const mgr = managerWithRect();
+      // Select second point
+      mgr.handleMouseDown({ x: 150, y: 150 });
+      mgr.handleMouseUp({ x: 150, y: 150 });
+      expect(mgr.selectedPointIdx).toBe(1);
+      mgr.handleKeyDown("Tab", false);
+      expect(mgr.selectedPointIdx).toBe(0);
+    });
+
+    test("Tab cycles through polyline points", () => {
+      const mgr = managerWithTriangle();
+      // Select start (0,0)
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseUp({ x: 0, y: 0 });
+      expect(mgr.selectedPointIdx).toBe(0);
+      mgr.handleKeyDown("Tab", false);
+      expect(mgr.selectedPointIdx).toBe(1);
+      mgr.handleKeyDown("Tab", false);
+      expect(mgr.selectedPointIdx).toBe(2);
+      mgr.handleKeyDown("Tab", false);
+      expect(mgr.selectedPointIdx).toBe(0); // wraps
+    });
+
+    test("Escape clears selection", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      expect(mgr.selectedMeasurementId).toBe("rect-1");
+      mgr.handleKeyDown("Escape", false);
+      expect(mgr.selectedMeasurementId).toBeNull();
+      expect(mgr.selectedPointIdx).toBeNull();
+    });
+
+    test("Delete removes selected measurement", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleKeyDown("Delete", false);
+      expect(mgr.measurements).toHaveLength(0);
+      expect(mgr.selectedMeasurementId).toBeNull();
+    });
+
+    test("Backspace removes selected measurement", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleKeyDown("Backspace", false);
+      expect(mgr.measurements).toHaveLength(0);
+    });
+
+    test("help hint shows selection shortcuts when selected", () => {
+      const mgr = managerWithRect();
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      const hint = mgr.getHelpHint();
+      expect(hint).toContain("nudge");
+      expect(hint).toContain("Tab");
+      expect(hint).toContain("Esc");
+    });
+  });
+
+  describe("saveVersion", () => {
+    test("increments on measurement completion", () => {
+      const mgr = createManager();
+      const before = mgr.saveVersion;
+      mgr.processActions({
+        completeMeasurement: {
+          kind: "rectangle",
+          id: "r1",
+          points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+        },
+      });
+      expect(mgr.saveVersion).toBe(before + 1);
+    });
+
+    test("increments on drag move", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "rect-1",
+        points: [{ x: 50, y: 50 }, { x: 150, y: 150 }],
+      });
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      const before = mgr.saveVersion;
+      mgr.handleMouseMove({ x: 70, y: 80 }); // exceeds threshold + drags
+      expect(mgr.saveVersion).toBeGreaterThan(before);
+    });
+
+    test("increments on delete hovered", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "rect-1",
+        points: [{ x: 50, y: 50 }, { x: 150, y: 150 }],
+      });
+      mgr.hoveredMeasurementId = "rect-1";
+      mgr.hoveredPointIdx = 0;
+      const before = mgr.saveVersion;
+      mgr.handleKeyDown("Delete", false);
+      expect(mgr.saveVersion).toBeGreaterThan(before);
     });
   });
 });

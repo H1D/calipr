@@ -1,6 +1,6 @@
 # Architectural Decision Records
 
-decisions[7]{id,title,context,choice,alternatives,date}:
+decisions[10]{id,title,context,choice,alternatives,date}:
   1,Declarative ToolActions,Tools communicate results to manager,Return ToolActions objects; manager interprets,Direct state mutation; event emitter,2026-02-12
   2,World coords with pan offset,Canvas needs scrolling,screenToWorld/worldToScreen with pan vector,CSS transform; virtual viewport,2026-02-12
   3,localStorage persistence,Session persistence without backend,localStorage with JSON serialization,IndexedDB; cookies,2026-02-12
@@ -8,3 +8,6 @@ decisions[7]{id,title,context,choice,alternatives,date}:
   5,Bulge-point arcs,Arcs in polylines need compact storage,Three-point (start/bulge/end) per segment,Center+radius+angles; Bezier curves,2026-02-12
   6,Dual-layer theming,Dark mode for CSS UI and canvas,CSS vars for DOM + ThemeColors palette objects for canvas,Single CSS-only approach; canvas reads computed styles,2026-02-13
   7,Crosshair as cross-tool concern,Alignment guides needed during point placement/drag,Computed in draw loop from existing manager state (isDragging/effectiveMousePos); no Tool interface changes,Per-tool crosshair logic; new ToolActions field,2026-02-13
+  8,Deferred drag for selection,Need click-to-select without triggering drag,3px threshold: mouseDown sets dragPending; mouseMove promotes to isDragging after threshold; mouseUp without threshold = select,Immediate drag with separate select tool; double-click to select,2026-02-13
+  9,Selection as cross-tool concern,Point selection/nudge needed across all tool types,State on ToolManager (like drag/hover); not a new Tool,Separate SelectTool; per-tool selection logic,2026-02-13
+  10,URL hash sharing with gzip,Share measurements without backend,Compact JSON→gzip→base64url in URL hash; CompressionStream API,Server-side short URLs; clipboard-only JSON; query params,2026-02-13
