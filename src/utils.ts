@@ -1,4 +1,4 @@
-import type { Point, Calibration, Unit } from "./types";
+import type { Point, Calibration, Unit, PolylineMeasurement } from "./types";
 import { DEFAULT_PX_PER_MM } from "./types";
 
 export function dist(a: Point, b: Point): number {
@@ -213,6 +213,60 @@ export function computeTangentArcBulge(segStart: Point, segEnd: Point, tangentDi
     x: cx + r * Math.cos(aMid),
     y: cy + r * Math.sin(aMid),
   };
+}
+
+/** Angle (in degrees) at vertex between vectors vertex→a and vertex→b. Returns 0 if points coincide. */
+export function vertexAngleDeg(a: Point, vertex: Point, b: Point): number {
+  const vax = a.x - vertex.x;
+  const vay = a.y - vertex.y;
+  const vbx = b.x - vertex.x;
+  const vby = b.y - vertex.y;
+
+  const magA = Math.sqrt(vax * vax + vay * vay);
+  const magB = Math.sqrt(vbx * vbx + vby * vby);
+  if (magA < 1e-10 || magB < 1e-10) return 0;
+
+  const cosAngle = Math.max(-1, Math.min(1, (vax * vbx + vay * vby) / (magA * magB)));
+  return Math.acos(cosAngle) * (180 / Math.PI);
+}
+
+export interface VertexAngle {
+  vertex: Point;
+  prev: Point;   // incoming direction reference point
+  next: Point;    // outgoing direction reference point
+  degrees: number;
+}
+
+/** Compute the angle at every junction vertex of a polyline. For closed polylines, includes the start vertex. */
+export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
+  const segs = m.segments;
+  if (segs.length < 2) return [];
+
+  const angles: VertexAngle[] = [];
+
+  // Interior vertices (where segment i meets segment i+1)
+  let prev = m.start;
+  for (let i = 0; i < segs.length - 1; i++) {
+    const vertex = segs[i]!.end;
+    const next = segs[i + 1]!.end;
+    angles.push({ vertex, prev, next, degrees: vertexAngleDeg(prev, vertex, next) });
+    prev = vertex;
+  }
+
+  // Closed polyline: angle at start (between closing segment and first segment)
+  if (m.closed && segs.length >= 2) {
+    // Previous point to start is the second-to-last segment's end
+    const prevToStart = segs[segs.length - 2]!.end;
+    const nextFromStart = segs[0]!.end;
+    angles.push({
+      vertex: m.start,
+      prev: prevToStart,
+      next: nextFromStart,
+      degrees: vertexAngleDeg(prevToStart, m.start, nextFromStart),
+    });
+  }
+
+  return angles;
 }
 
 export function gridVisibleRange(panX: number, panY: number, width: number, height: number, gridStep: number) {

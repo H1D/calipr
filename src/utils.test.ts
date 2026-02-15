@@ -18,8 +18,10 @@ import {
   screenToWorld,
   worldToScreen,
   gridVisibleRange,
+  vertexAngleDeg,
 } from "./utils";
-import type { Calibration, Point } from "./types";
+import type { Calibration, Point, PolylineMeasurement } from "./types";
+import { polylineVertexAngles } from "./utils";
 
 describe("dist", () => {
   test("returns 0 for same point", () => {
@@ -427,5 +429,103 @@ describe("gridVisibleRange", () => {
     const r = gridVisibleRange(0, 150, 1920, 1080, 50);
     expect(r.startY).toBe(-150);
     expect(r.endY).toBe(930);
+  });
+});
+
+describe("vertexAngleDeg", () => {
+  test("right angle (90°)", () => {
+    // L-shape: horizontal then vertical
+    expect(vertexAngleDeg({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 })).toBeCloseTo(90, 1);
+  });
+
+  test("straight line (180°)", () => {
+    expect(vertexAngleDeg({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 200, y: 0 })).toBeCloseTo(180, 1);
+  });
+
+  test("equilateral triangle (60°)", () => {
+    const a = { x: 0, y: 0 };
+    const b = { x: 100, y: 0 };
+    const c = { x: 50, y: 86.6025 }; // ~100 * sin(60°)
+    expect(vertexAngleDeg(a, b, c)).toBeCloseTo(60, 0);
+  });
+
+  test("acute angle (45°)", () => {
+    // Vectors from origin: (100,0) and (100,100) → 45°
+    expect(vertexAngleDeg({ x: 100, y: 0 }, { x: 0, y: 0 }, { x: 100, y: 100 })).toBeCloseTo(45, 0);
+  });
+
+  test("obtuse angle (135°)", () => {
+    // Vectors from origin: (100,0) and (-100,100) → 135°
+    expect(vertexAngleDeg({ x: 100, y: 0 }, { x: 0, y: 0 }, { x: -100, y: 100 })).toBeCloseTo(135, 0);
+  });
+
+  test("coincident points return 0", () => {
+    expect(vertexAngleDeg({ x: 5, y: 5 }, { x: 5, y: 5 }, { x: 10, y: 10 })).toBe(0);
+    expect(vertexAngleDeg({ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 5, y: 5 })).toBe(0);
+  });
+});
+
+describe("polylineVertexAngles", () => {
+  test("single segment has no angles", () => {
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "p1",
+      start: { x: 0, y: 0 },
+      segments: [{ end: { x: 100, y: 0 } }],
+    };
+    expect(polylineVertexAngles(m)).toEqual([]);
+  });
+
+  test("two segments produce one angle at junction", () => {
+    // Right angle at (100,0)
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "p1",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 100, y: 100 } },
+      ],
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles).toHaveLength(1);
+    expect(angles[0]!.vertex).toEqual({ x: 100, y: 0 });
+    expect(angles[0]!.degrees).toBeCloseTo(90, 1);
+  });
+
+  test("closed triangle has angles at all 3 vertices", () => {
+    // Right triangle
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "p1",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 0, y: 100 } },
+        { end: { x: 0, y: 0 } }, // closing segment
+      ],
+      closed: true,
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles).toHaveLength(3);
+    // Sum of interior angles of a triangle = 180°
+    const sum = angles.reduce((s, a) => s + a.degrees, 0);
+    expect(sum).toBeCloseTo(180, 0);
+  });
+
+  test("closed square has 4 right angles", () => {
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "p1",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 100, y: 100 } },
+        { end: { x: 0, y: 100 } },
+        { end: { x: 0, y: 0 } },
+      ],
+      closed: true,
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles).toHaveLength(4);
+    for (const a of angles) {
+      expect(a.degrees).toBeCloseTo(90, 1);
+    }
   });
 });

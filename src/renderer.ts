@@ -1,9 +1,11 @@
-import type { Point, Measurement, Calibration, Unit, PolylineSegment } from "./types";
-import { distToUnit, formatValue, midpoint, pxToUnit, arcLengthToUnit, circumscribedCircle, angleSweepThrough, gridVisibleRange } from "./utils";
+import type { Point, Measurement, Calibration, Unit, PolylineSegment, PolylineMeasurement } from "./types";
+import { distToUnit, formatValue, midpoint, pxToUnit, arcLengthToUnit, circumscribedCircle, angleSweepThrough, gridVisibleRange, polylineVertexAngles } from "./utils";
 
 const POINT_RADIUS = 5;
 const LINE_WIDTH = 2;
 const LABEL_FONT = "13px 'Segoe UI', system-ui, sans-serif";
+const ANGLE_FONT = "11px 'Segoe UI', system-ui, sans-serif";
+const ANGLE_ARC_RADIUS = 18;
 const GRID_STEP = 50;
 
 export interface ThemeColors {
@@ -27,6 +29,8 @@ export interface ThemeColors {
   closeSnapText: string;
   snapTangent: string;
   snapPerpendicular: string;
+  angleArc: string;
+  angleText: string;
   crosshair: string;
   calFill: string;
   calStroke: string;
@@ -66,6 +70,8 @@ export const LIGHT_COLORS: ThemeColors = {
   closeSnapText: "rgba(30, 64, 175, 0.6)",
   snapTangent: "rgba(0, 180, 0, 0.3)",
   snapPerpendicular: "rgba(0, 120, 255, 0.3)",
+  angleArc: "rgba(120, 120, 120, 0.5)",
+  angleText: "#666",
   crosshair: "rgba(255, 60, 60, 0.3)",
   calFill: "rgba(220, 38, 38, 0.85)",
   calStroke: "#dc2626",
@@ -105,6 +111,8 @@ export const DARK_COLORS: ThemeColors = {
   closeSnapText: "rgba(91, 141, 239, 0.6)",
   snapTangent: "rgba(0, 200, 0, 0.35)",
   snapPerpendicular: "rgba(60, 160, 255, 0.35)",
+  angleArc: "rgba(180, 180, 200, 0.5)",
+  angleText: "#b0b0d0",
   crosshair: "rgba(255, 100, 100, 0.3)",
   calFill: "rgba(248, 113, 113, 0.8)",
   calStroke: "#f87171",
@@ -365,6 +373,14 @@ export class Renderer {
       }
     }
 
+    // Vertex angles
+    if (!hideLabels && segments.length >= 2) {
+      const m: PolylineMeasurement = { kind: "polyline", id: "", start, segments, closed };
+      for (const angle of polylineVertexAngles(m)) {
+        this.drawAngleIndicator(angle.vertex, angle.prev, angle.next, angle.degrees);
+      }
+    }
+
     // Preview line to mouse (only when not closed)
     if (!closed && mousePos) {
       this.drawLine(prev, mousePos, true);
@@ -395,6 +411,41 @@ export class Renderer {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+  }
+
+  drawAngleIndicator(vertex: Point, prev: Point, next: Point, degrees: number) {
+    const ctx = this.ctx;
+
+    // Compute angles from vertex to each neighbor
+    const angleA = Math.atan2(prev.y - vertex.y, prev.x - vertex.x);
+    const angleB = Math.atan2(next.y - vertex.y, next.x - vertex.x);
+
+    // Determine the shorter sweep direction
+    let sweep = angleB - angleA;
+    while (sweep > Math.PI) sweep -= 2 * Math.PI;
+    while (sweep < -Math.PI) sweep += 2 * Math.PI;
+    const ccw = sweep < 0;
+
+    // Draw small arc
+    ctx.beginPath();
+    ctx.arc(vertex.x, vertex.y, ANGLE_ARC_RADIUS, angleA, angleB, ccw);
+    ctx.strokeStyle = this.colors.angleArc;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Label at midpoint of arc, offset outward
+    const midAngle = angleA + sweep / 2;
+    const labelRadius = ANGLE_ARC_RADIUS + 12;
+    const labelPos = {
+      x: vertex.x + labelRadius * Math.cos(midAngle),
+      y: vertex.y + labelRadius * Math.sin(midAngle),
+    };
+
+    ctx.font = ANGLE_FONT;
+    ctx.fillStyle = this.colors.angleText;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${degrees.toFixed(1)}°`, labelPos.x, labelPos.y);
   }
 
   drawCloseSnapRing(p: Point) {
