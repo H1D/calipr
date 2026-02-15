@@ -386,9 +386,12 @@ export function getMeasurementPoints(m: Measurement): Point[] {
   switch (m.kind) {
     case "polyline": {
       const pts: Point[] = [m.start];
-      for (const seg of m.segments) {
+      const lastIdx = m.segments.length - 1;
+      for (let i = 0; i < m.segments.length; i++) {
+        const seg = m.segments[i]!;
         if (seg.bulge) pts.push(seg.bulge);
-        pts.push(seg.end);
+        // Skip closing segment's end — it duplicates m.start
+        if (!(m.closed && i === lastIdx)) pts.push(seg.end);
       }
       return pts;
     }
@@ -401,7 +404,13 @@ export function getMeasurementPoints(m: Measurement): Point[] {
 export function setMeasurementPoint(m: Measurement, idx: number, p: Point) {
   switch (m.kind) {
     case "polyline": {
-      if (idx === 0) { m.start = p; break; }
+      if (idx === 0) {
+        m.start = p;
+        if (m.closed && m.segments.length > 0) {
+          m.segments[m.segments.length - 1]!.end = p;
+        }
+        break;
+      }
       let ci = 1;
       for (const seg of m.segments) {
         if (seg.bulge) {

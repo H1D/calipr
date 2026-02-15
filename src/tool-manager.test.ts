@@ -584,6 +584,47 @@ describe("getMeasurementPoints", () => {
     expect(pts[0]).toEqual({ x: 100, y: 100 });
     expect(pts[1]).toEqual({ x: 150, y: 100 });
   });
+
+  test("closed polyline with arc does NOT duplicate start/end point", () => {
+    // Triangle closed with an arc: last segment end === start
+    const m: PolylineMeasurement = {
+      kind: "polyline",
+      id: "p-closed-arc",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 50, y: 80 } },
+        { end: { x: 0, y: 0 }, bulge: { x: 10, y: 40 } }, // closing arc
+      ],
+      closed: true,
+    };
+    const pts = getMeasurementPoints(m);
+    // Should be: start(0,0), end1(100,0), end2(50,80), bulge(10,40)
+    // Should NOT include closing segment's end (duplicate of start)
+    expect(pts).toHaveLength(4);
+    expect(pts[0]).toEqual({ x: 0, y: 0 });
+    expect(pts[1]).toEqual({ x: 100, y: 0 });
+    expect(pts[2]).toEqual({ x: 50, y: 80 });
+    expect(pts[3]).toEqual({ x: 10, y: 40 });
+  });
+
+  test("closed polyline WITHOUT arc also skips duplicate end", () => {
+    // Closed triangle with straight closing segment
+    const m: PolylineMeasurement = {
+      kind: "polyline",
+      id: "p-closed-straight",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 50, y: 80 } },
+        { end: { x: 0, y: 0 } }, // closing straight segment
+      ],
+      closed: true,
+    };
+    const pts = getMeasurementPoints(m);
+    // Should be: start(0,0), end1(100,0), end2(50,80) — no duplicate
+    expect(pts).toHaveLength(3);
+  });
 });
 
 describe("setMeasurementPoint", () => {
@@ -639,6 +680,24 @@ describe("setMeasurementPoint", () => {
     };
     setMeasurementPoint(m, 1, { x: 30, y: 40 });
     expect(m.radiusPx).toBeCloseTo(50, 1); // 3-4-5 triangle
+  });
+
+  test("moving start of closed polyline also updates closing segment end", () => {
+    const m: PolylineMeasurement = {
+      kind: "polyline",
+      id: "p-closed",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 50, y: 80 } },
+        { end: { x: 0, y: 0 }, bulge: { x: 10, y: 40 } },
+      ],
+      closed: true,
+    };
+    setMeasurementPoint(m, 0, { x: 5, y: 5 });
+    expect(m.start).toEqual({ x: 5, y: 5 });
+    // The closing segment's end must track the start
+    expect(m.segments[2]!.end).toEqual({ x: 5, y: 5 });
   });
 });
 
