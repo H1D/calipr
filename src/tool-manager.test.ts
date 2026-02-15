@@ -236,6 +236,52 @@ describe("ToolManager", () => {
     });
   });
 
+  describe("dblclick after select should NOT remove point", () => {
+    test("clicking to select then dblclick does not delete", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "polyline",
+        id: "poly-1",
+        start: { x: 0, y: 0 },
+        segments: [
+          { end: { x: 100, y: 0 } },
+          { end: { x: 200, y: 0 } },
+        ],
+      });
+      // Simulate: click on point → select (1st click of accidental dblclick)
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseUp({ x: 0, y: 0 });
+      expect(mgr.selectedMeasurementId).toBe("poly-1");
+
+      // Simulate: 2nd click (user tries to grab, browser sees dblclick)
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseUp({ x: 0, y: 0 });
+
+      // Browser fires dblclick — should NOT remove the point
+      mgr.handleDblClick();
+      const poly = mgr.measurements[0]! as PolylineMeasurement;
+      expect(poly.segments).toHaveLength(2); // still 2 segments, nothing removed
+    });
+
+    test("clicking to select then dblclick does not delete entire measurement", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "polyline",
+        id: "poly-1",
+        start: { x: 0, y: 0 },
+        segments: [{ end: { x: 5, y: 0 } }],
+      });
+      // Click on start → select
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseUp({ x: 0, y: 0 });
+      // 2nd click + dblclick
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseUp({ x: 0, y: 0 });
+      mgr.handleDblClick();
+      expect(mgr.measurements).toHaveLength(1); // NOT deleted
+    });
+  });
+
   describe("keyboard: Delete/Backspace", () => {
     test("deletes hovered measurement when no active tool state", () => {
       const mgr = createManager();

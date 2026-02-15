@@ -36,6 +36,7 @@ export class ToolManager {
   nudgeHideLabelsUntil = 0;
   private dragPending = false;
   private dragStartPos: Point | null = null;
+  private lastMouseDownWasHit = false;
 
   // Persistence version (incremented on every measurement mutation)
   saveVersion = 0;
@@ -181,6 +182,7 @@ export class ToolManager {
   /** Returns true if the event was consumed (drag started or click handled) */
   handleMouseDown(screenPos: Point): boolean {
     if (this.isPanning) return false;
+    this.lastMouseDownWasHit = false;
 
     const pos = screenToWorld(screenPos, this.panX, this.panY);
 
@@ -188,6 +190,7 @@ export class ToolManager {
     if (!this._activeTool.hasActiveMeasurement()) {
       const hit = findHoveredPoint(this.measurements, pos);
       if (hit) {
+        this.lastMouseDownWasHit = true;
         this.dragInfo = hit;
         this.dragPending = true;
         this.dragStartPos = screenPos;
@@ -245,7 +248,8 @@ export class ToolManager {
 
   handleDblClick(): void {
     // Double-click on a completed polyline point to remove it
-    if (!this._activeTool.hasActiveMeasurement()) {
+    // Skip if the mousedown was consumed by selection/drag (prevents accidental deletion)
+    if (!this.lastMouseDownWasHit && !this._activeTool.hasActiveMeasurement()) {
       const hit = findHoveredPoint(this.measurements, this.mousePos);
       if (hit) {
         const mIdx = this.measurements.findIndex((m) => m.id === hit.measurementId);
