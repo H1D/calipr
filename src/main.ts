@@ -288,6 +288,7 @@ canvas.addEventListener("mousedown", (e) => {
   }
 
   manager.handleMouseDown({ x: e.clientX, y: e.clientY });
+
   if (manager.isDragging) {
     canvas.style.cursor = "grabbing";
   }
@@ -298,6 +299,7 @@ canvas.addEventListener("mouseup", (e) => {
   if (e.button !== 0) return;
   const wasDragging = manager.isDragging;
   manager.handleMouseUp({ x: e.clientX, y: e.clientY });
+
   if (wasDragging) {
     canvas.style.cursor = "crosshair";
   }

@@ -391,11 +391,15 @@ export function getMeasurementPoints(m: Measurement): Point[] {
     case "polyline": {
       const pts: Point[] = [m.start];
       const lastIdx = m.segments.length - 1;
+      // Detect explicit closing segment: last end === start (exact match)
+      const lastEnd = lastIdx >= 0 ? m.segments[lastIdx]!.end : null;
+      const hasClosingSeg = m.closed && lastEnd !== null &&
+        lastEnd.x === m.start.x && lastEnd.y === m.start.y;
       for (let i = 0; i < m.segments.length; i++) {
         const seg = m.segments[i]!;
         if (seg.bulge) pts.push(seg.bulge);
-        // Skip closing segment's end — it duplicates m.start
-        if (!(m.closed && i === lastIdx)) pts.push(seg.end);
+        // Skip only if this is the closing segment that duplicates start
+        if (!(hasClosingSeg && i === lastIdx)) pts.push(seg.end);
       }
       return pts;
     }
@@ -409,10 +413,15 @@ export function setMeasurementPoint(m: Measurement, idx: number, p: Point) {
   switch (m.kind) {
     case "polyline": {
       if (idx === 0) {
-        m.start = p;
+        // Sync closing segment's end only if it actually duplicates start
         if (m.closed && m.segments.length > 0) {
-          m.segments[m.segments.length - 1]!.end = p;
+          const lastEnd = m.segments[m.segments.length - 1]!.end;
+          if (lastEnd.x === m.start.x && lastEnd.y === m.start.y) {
+            lastEnd.x = p.x;
+            lastEnd.y = p.y;
+          }
         }
+        m.start = p;
         break;
       }
       let ci = 1;

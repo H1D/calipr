@@ -654,8 +654,10 @@ describe("getMeasurementPoints", () => {
     expect(pts[3]).toEqual({ x: 10, y: 40 });
   });
 
-  test("closed polyline WITHOUT arc also skips duplicate end", () => {
-    // Closed triangle with straight closing segment
+  test("closed polyline WITHOUT arc (closing segment popped) keeps all vertices", () => {
+    // LineTool pops the straight closing segment on close, so the data looks like:
+    // segments = [{end: B}, {end: C}], closed = true
+    // C is a REAL vertex, not a duplicate of start — must NOT be skipped.
     const m: PolylineMeasurement = {
       kind: "polyline",
       id: "p-closed-straight",
@@ -663,13 +665,15 @@ describe("getMeasurementPoints", () => {
       segments: [
         { end: { x: 100, y: 0 } },
         { end: { x: 50, y: 80 } },
-        { end: { x: 0, y: 0 } }, // closing straight segment
       ],
       closed: true,
     };
     const pts = getMeasurementPoints(m);
-    // Should be: start(0,0), end1(100,0), end2(50,80) — no duplicate
+    // Should be 3 points: start(0,0), B(100,0), C(50,80)
     expect(pts).toHaveLength(3);
+    expect(pts[0]).toEqual({ x: 0, y: 0 });
+    expect(pts[1]).toEqual({ x: 100, y: 0 });
+    expect(pts[2]).toEqual({ x: 50, y: 80 });
   });
 });
 
@@ -728,7 +732,7 @@ describe("setMeasurementPoint", () => {
     expect(m.radiusPx).toBeCloseTo(50, 1); // 3-4-5 triangle
   });
 
-  test("moving start of closed polyline also updates closing segment end", () => {
+  test("moving start of closed polyline with arc updates closing segment end", () => {
     const m: PolylineMeasurement = {
       kind: "polyline",
       id: "p-closed",
@@ -744,6 +748,24 @@ describe("setMeasurementPoint", () => {
     expect(m.start).toEqual({ x: 5, y: 5 });
     // The closing segment's end must track the start
     expect(m.segments[2]!.end).toEqual({ x: 5, y: 5 });
+  });
+
+  test("moving start of closed polyline WITHOUT arc does NOT overwrite last vertex", () => {
+    // LineTool pops the closing segment — last seg end is a real vertex, not a duplicate
+    const m: PolylineMeasurement = {
+      kind: "polyline",
+      id: "p-closed-noarc",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 50, y: 80 } },
+      ],
+      closed: true,
+    };
+    setMeasurementPoint(m, 0, { x: 5, y: 5 });
+    expect(m.start).toEqual({ x: 5, y: 5 });
+    // Vertex C must NOT be overwritten — it's a real vertex, not a closing duplicate
+    expect(m.segments[1]!.end).toEqual({ x: 50, y: 80 });
   });
 });
 
