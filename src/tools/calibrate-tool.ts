@@ -73,6 +73,10 @@ export class CalibrateTool implements Tool {
     return "";
   }
 
+  getActiveKeyContext(_ctx: ToolContext): string | null {
+    return null;
+  }
+
   hasActiveMeasurement(): boolean {
     return false;
   }

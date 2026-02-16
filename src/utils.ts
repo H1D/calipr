@@ -258,6 +258,7 @@ export interface VertexAngle {
   prev: Point;   // incoming direction reference point
   next: Point;    // outgoing direction reference point
   degrees: number;
+  hasAdjacentArc: boolean; // true if either incoming or outgoing segment is an arc
 }
 
 /** Reference point for the incoming direction at vertex (segment ends at vertex). */
@@ -292,7 +293,8 @@ export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
     const segStart = i > 0 ? segs[i - 1]!.end : m.start;
     const prev = incomingRef(segStart, segs[i]!, vertex);
     const next = outgoingRef(vertex, segs[i + 1]!);
-    angles.push({ vertex, prev, next, degrees: vertexAngleDeg(prev, vertex, next) });
+    const hasAdjacentArc = !!segs[i]!.bulge || !!segs[i + 1]!.bulge;
+    angles.push({ vertex, prev, next, degrees: vertexAngleDeg(prev, vertex, next), hasAdjacentArc });
   }
 
   // Closed polyline: additional angles for closing loop
@@ -304,11 +306,14 @@ export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
       // Closing segment was popped: angle at last vertex (→ implicit straight close to start)
       const prevSegStart = segs.length >= 2 ? segs[segs.length - 2]!.end : m.start;
       const prev = incomingRef(prevSegStart, segs[segs.length - 1]!, lastEnd);
+      // Implicit closing segment is always straight, so only incoming matters
+      const hasAdjacentArc = !!segs[segs.length - 1]!.bulge;
       angles.push({
         vertex: lastEnd,
         prev,
-        next: m.start, // implicit straight close → chord direction is fine
+        next: m.start,
         degrees: vertexAngleDeg(prev, lastEnd, m.start),
+        hasAdjacentArc,
       });
     }
 
@@ -318,11 +323,14 @@ export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
       const closeStart = segs.length >= 2 ? segs[segs.length - 2]!.end : m.start;
       const prev = incomingRef(closeStart, segs[segs.length - 1]!, m.start);
       const next = outgoingRef(m.start, segs[0]!);
-      angles.push({ vertex: m.start, prev, next, degrees: vertexAngleDeg(prev, m.start, next) });
+      const hasAdjacentArc = !!segs[segs.length - 1]!.bulge || !!segs[0]!.bulge;
+      angles.push({ vertex: m.start, prev, next, degrees: vertexAngleDeg(prev, m.start, next), hasAdjacentArc });
     } else {
       // Popped closing: incoming = implicit straight from lastEnd, outgoing = seg[0]
       const next = outgoingRef(m.start, segs[0]!);
-      angles.push({ vertex: m.start, prev: lastEnd, next, degrees: vertexAngleDeg(lastEnd, m.start, next) });
+      // Implicit closing segment is straight, so only outgoing matters
+      const hasAdjacentArc = !!segs[0]!.bulge;
+      angles.push({ vertex: m.start, prev: lastEnd, next, degrees: vertexAngleDeg(lastEnd, m.start, next), hasAdjacentArc });
     }
   }
 

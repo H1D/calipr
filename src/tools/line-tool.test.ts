@@ -218,7 +218,16 @@ describe("LineTool", () => {
     expect(tool.getHelpHint(ctx())).toContain("hold & drag");
 
     tool.onClick({ x: 100, y: 0 }, ctx());
-    expect(tool.getHelpHint(ctx())).toContain("Enter");
+    // Instructional text only — key hints moved to registry
+    expect(tool.getHelpHint(ctx())).toContain("hold & drag");
+    expect(tool.getHelpHint(ctx())).not.toContain("Enter");
+  });
+
+  test("getActiveKeyContext returns null when idle, line.drawing when active", () => {
+    const tool = new LineTool();
+    expect(tool.getActiveKeyContext(ctx())).toBeNull();
+    tool.onClick({ x: 0, y: 0 }, ctx());
+    expect(tool.getActiveKeyContext(ctx())).toBe("line.drawing");
   });
 
   test("mouseUp with no active arc does nothing", () => {

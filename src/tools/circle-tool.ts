@@ -70,6 +70,10 @@ export class CircleTool implements Tool {
     return !this.activeMeasurement ? "Click to place center" : "Click to set radius";
   }
 
+  getActiveKeyContext(_ctx: ToolContext): string | null {
+    return this.activeMeasurement ? "circle.drawing" : null;
+  }
+
   hasActiveMeasurement(): boolean {
     return this.activeMeasurement !== null;
   }

@@ -37,5 +37,6 @@ export interface Tool {
   onKeyDown(key: string, shiftKey: boolean, ctx: ToolContext): ToolActions | null;
   getDrawState(ctx: ToolContext): ToolDrawState;
   getHelpHint(ctx: ToolContext): string;
+  getActiveKeyContext(ctx: ToolContext): string | null;
   hasActiveMeasurement(): boolean;
 }

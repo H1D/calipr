@@ -16,18 +16,20 @@ tools[4]{name,file,complexity,notes}:
 cross_tool_concerns[8]{concern,handler}:
   Dragging completed measurement points,ToolManager (deferred drag with 3px threshold)
   Hover detection on completed points,ToolManager
-  Double-click to remove polyline points,ToolManager
+  Double-click to remove polyline points,ToolManager (selected or unselected)
+  Delete/Backspace on selected point,ToolManager (polyline: remove point; others: delete measurement)
   Delete/Backspace to remove hovered measurement,ToolManager (fallback when tool returns null)
-  Snap hint suffix in help text,ToolManager
-  Selection (click-to-select; arrow-nudge 0.5px; Tab cycle; Escape deselect),ToolManager
+  Selection (click-to-select; arrow-nudge 0.5px; Tab cycle; Del point; Escape deselect),ToolManager
   Calibration gate (hide measurements until calibrated),main.ts draw loop + renderer.drawCalibrationGate()
-  Help hint priority system,ToolManager.getHelpHint(): selection hint > tool base hint > snap suffix
+  Help hint priority system,ToolManager.getHelpHint() + keybind-registry
 
 help_hint_system:
   element: "#help-hint (fixed bottom-center, above toolbar)"
-  architecture: "Tool.getHelpHint() → ToolManager layers cross-tool overrides → main.ts renders"
-  priority: "selection hint > tool base hint > snap suffix"
-  pattern: "Every interaction state should have a discoverable hint"
+  architecture: "Tool.getHelpHint() returns instructional text; Tool.getActiveKeyContext() returns context ID; keybind-registry resolves bindings; ToolManager composes all three layers"
+  priority: "selection context > (tool instruction + tool key context) > snap context"
+  pattern: "Every keybinding must be declared in keybind-registry with a visible label"
+  registry_file: src/keybind-registry.ts
+  contexts: "selection; line.empty; line.drawing; rect.drawing; circle.drawing; snap"
 
 # Polyline Arc System
 

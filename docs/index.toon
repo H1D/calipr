@@ -5,7 +5,7 @@ project: ruler2
 desc: Canvas-based screen measurement tool. Vanilla TypeScript, Canvas 2D API, localStorage.
 repo: https://github.com/H1D/calipr
 
-features[9]{id,name,domain,status,files,added}:
+features[12]{id,name,domain,status,files,added}:
   1,Strategy Pattern Tools,architecture,done,src/tool.ts;src/tool-manager.ts;src/tools/,2026-02-12
   2,Polyline Arc System,tools,done,src/polyline-arc.ts;src/tools/line-tool.ts,2026-02-12
   3,Credit Card Calibration,calibration,done,src/tools/calibrate-tool.ts,2026-02-12
@@ -15,16 +15,20 @@ features[9]{id,name,domain,status,files,added}:
   7,Alignment Crosshair,ui,done,src/renderer.ts;src/main.ts,2026-02-13
   8,Select Mode,ui,done,src/tool-manager.ts;src/renderer.ts;src/main.ts,2026-02-13
   9,URL Share + Calibration Gate,sharing,done,src/share.ts;src/main.ts;src/renderer.ts;index.html,2026-02-13
+  10,Keybinding Registry,architecture,done,src/keybind-registry.ts;src/tool.ts;src/tool-manager.ts,2026-02-16
+  11,Per-point Polyline Deletion,tools,done,src/tool-manager.ts,2026-02-16
+  12,Angle Label Filtering,ui,done,src/renderer.ts,2026-02-16
 
-modules[11]{name,file,purpose}:
+modules[12]{name,file,purpose}:
   main,src/main.ts,App entry; DOM events; theme logic; toast; URL decode
   types,src/types.ts,Point Measurement Calibration ToolType Unit
   tool,src/tool.ts,Tool strategy interface and ToolActions
   tool-manager,src/tool-manager.ts,Event delegation; shared state; drag/hover/selection
-  renderer,src/renderer.ts,Canvas 2D drawing; ThemeColors palettes; calibration gate
+  renderer,src/renderer.ts,Canvas 2D drawing; ThemeColors palettes; calibration gate; angle filtering
   utils,src/utils.ts,Geometry math; coordinate transforms
   storage,src/storage.ts,localStorage persistence
   keybindings,src/keybindings.ts,4 keyboard presets
+  keybind-registry,src/keybind-registry.ts,Centralized keybinding contexts; hint generation
   export-svg,src/export-svg.ts,SVG export with arc segments
   polyline-arc,src/polyline-arc.ts,Arc hold/drag gesture; tangent constraints
   share,src/share.ts,URL hash encode/decode with gzip compression

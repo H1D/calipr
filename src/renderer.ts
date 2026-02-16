@@ -377,7 +377,9 @@ export class Renderer {
     if (!hideLabels && segments.length >= 2) {
       const m: PolylineMeasurement = { kind: "polyline", id: "", start, segments, closed };
       for (const angle of polylineVertexAngles(m)) {
-        this.drawAngleIndicator(angle.vertex, angle.prev, angle.next, angle.degrees);
+        if (!angle.hasAdjacentArc) {
+          this.drawAngleIndicator(angle.vertex, angle.prev, angle.next, angle.degrees);
+        }
       }
     }
 

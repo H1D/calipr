@@ -491,6 +491,50 @@ describe("polylineVertexAngles", () => {
     expect(angles[0]!.degrees).toBeCloseTo(90, 1);
   });
 
+  test("hasAdjacentArc is false for two straight segments", () => {
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "p1",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 100, y: 100 } },
+      ],
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles[0]!.hasAdjacentArc).toBe(false);
+  });
+
+  test("hasAdjacentArc is true at straight-to-arc junction", () => {
+    const bulge = computeTangentArcBulge({ x: 100, y: 0 }, { x: 200, y: -50 }, { x: 1, y: 0 });
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "p1",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 200, y: -50 }, bulge: bulge! },
+      ],
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles[0]!.hasAdjacentArc).toBe(true);
+  });
+
+  test("hasAdjacentArc is true at arc-to-straight junction", () => {
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "p1",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 }, bulge: { x: 50, y: 30 } },
+        { end: { x: 200, y: 0 } },
+        { end: { x: 200, y: 100 } },
+      ],
+    };
+    const angles = polylineVertexAngles(m);
+    // Junction 0: arc→straight → true
+    expect(angles[0]!.hasAdjacentArc).toBe(true);
+    // Junction 1: straight→straight → false
+    expect(angles[1]!.hasAdjacentArc).toBe(false);
+  });
+
   test("closed triangle has angles at all 3 vertices", () => {
     // Right triangle
     const m: PolylineMeasurement = {

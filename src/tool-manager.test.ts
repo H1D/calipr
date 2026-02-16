@@ -236,8 +236,8 @@ describe("ToolManager", () => {
     });
   });
 
-  describe("dblclick after select should NOT remove point", () => {
-    test("clicking to select then dblclick does not delete", () => {
+  describe("dblclick removes selected polyline point", () => {
+    test("dblclick on selected polyline point removes only that point", () => {
       const mgr = createManager();
       mgr.measurements.push({
         kind: "polyline",
@@ -248,22 +248,24 @@ describe("ToolManager", () => {
           { end: { x: 200, y: 0 } },
         ],
       });
-      // Simulate: click on point → select (1st click of accidental dblclick)
+      // Click to select start
       mgr.handleMouseDown({ x: 0, y: 0 });
       mgr.handleMouseUp({ x: 0, y: 0 });
       expect(mgr.selectedMeasurementId).toBe("poly-1");
 
-      // Simulate: 2nd click (user tries to grab, browser sees dblclick)
+      // 2nd click + dblclick
       mgr.handleMouseDown({ x: 0, y: 0 });
       mgr.handleMouseUp({ x: 0, y: 0 });
 
-      // Browser fires dblclick — should NOT remove the point
       mgr.handleDblClick();
+      // Point removed, but measurement survives
+      expect(mgr.measurements).toHaveLength(1);
       const poly = mgr.measurements[0]! as PolylineMeasurement;
-      expect(poly.segments).toHaveLength(2); // still 2 segments, nothing removed
+      expect(poly.segments).toHaveLength(1);
+      expect(mgr.selectedMeasurementId).toBeNull();
     });
 
-    test("clicking to select then dblclick does not delete entire measurement", () => {
+    test("dblclick on selected polyline with 1 segment deletes measurement", () => {
       const mgr = createManager();
       mgr.measurements.push({
         kind: "polyline",
@@ -271,14 +273,29 @@ describe("ToolManager", () => {
         start: { x: 0, y: 0 },
         segments: [{ end: { x: 5, y: 0 } }],
       });
-      // Click on start → select
       mgr.handleMouseDown({ x: 0, y: 0 });
       mgr.handleMouseUp({ x: 0, y: 0 });
-      // 2nd click + dblclick
       mgr.handleMouseDown({ x: 0, y: 0 });
       mgr.handleMouseUp({ x: 0, y: 0 });
       mgr.handleDblClick();
-      expect(mgr.measurements).toHaveLength(1); // NOT deleted
+      // 0 segments left → measurement deleted
+      expect(mgr.measurements).toHaveLength(0);
+    });
+
+    test("dblclick on selected rectangle does NOT remove point", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "rect-1",
+        points: [{ x: 50, y: 50 }, { x: 150, y: 150 }],
+      });
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleMouseDown({ x: 50, y: 50 });
+      mgr.handleMouseUp({ x: 50, y: 50 });
+      mgr.handleDblClick();
+      // Rectangle points are not individually removable
+      expect(mgr.measurements).toHaveLength(1);
     });
   });
 
@@ -534,6 +551,72 @@ describe("ToolManager", () => {
       expect(mgr.measurements).toHaveLength(0);
     });
 
+    test("Delete on selected polyline point removes only that point", () => {
+      const mgr = managerWithTriangle();
+      // Select middle endpoint (100, 0) — pointIndex 1
+      mgr.handleMouseDown({ x: 100, y: 0 });
+      mgr.handleMouseUp({ x: 100, y: 0 });
+      expect(mgr.selectedMeasurementId).toBe("poly-1");
+      expect(mgr.selectedPointIdx).toBe(1);
+      mgr.handleKeyDown("Delete", false);
+      // Measurement still exists with 1 fewer segment
+      expect(mgr.measurements).toHaveLength(1);
+      const poly = mgr.measurements[0]! as PolylineMeasurement;
+      expect(poly.segments).toHaveLength(1);
+      expect(mgr.selectedMeasurementId).toBeNull();
+    });
+
+    test("Delete on selected polyline start removes start, shifts to next", () => {
+      const mgr = managerWithTriangle();
+      // Select start (0, 0)
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseUp({ x: 0, y: 0 });
+      mgr.handleKeyDown("Delete", false);
+      expect(mgr.measurements).toHaveLength(1);
+      const poly = mgr.measurements[0]! as PolylineMeasurement;
+      expect(poly.start).toEqual({ x: 100, y: 0 });
+      expect(poly.segments).toHaveLength(1);
+    });
+
+    test("Delete on selected polyline with 1 segment deletes entire measurement", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "polyline",
+        id: "poly-1",
+        start: { x: 0, y: 0 },
+        segments: [{ end: { x: 100, y: 0 } }],
+      });
+      // Select start
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseUp({ x: 0, y: 0 });
+      mgr.handleKeyDown("Delete", false);
+      // Removing start leaves 0 segments → measurement deleted
+      expect(mgr.measurements).toHaveLength(0);
+    });
+
+    test("Delete on selected polyline bulge removes only the bulge", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "polyline",
+        id: "poly-arc",
+        start: { x: 0, y: 0 },
+        segments: [
+          { end: { x: 100, y: 0 }, bulge: { x: 50, y: 25 } },
+          { end: { x: 200, y: 0 } },
+        ],
+      });
+      // Select the bulge point (50, 25) — pointIndex 1
+      mgr.handleMouseDown({ x: 50, y: 25 });
+      mgr.handleMouseUp({ x: 50, y: 25 });
+      expect(mgr.selectedPointIdx).toBe(1);
+      mgr.handleKeyDown("Delete", false);
+      expect(mgr.measurements).toHaveLength(1);
+      const poly = mgr.measurements[0]! as PolylineMeasurement;
+      // Bulge removed, arc → straight; segments count unchanged
+      expect(poly.segments).toHaveLength(2);
+      expect(poly.segments[0]!.bulge).toBeUndefined();
+    });
+
     test("help hint shows selection shortcuts when selected", () => {
       const mgr = managerWithRect();
       mgr.handleMouseDown({ x: 50, y: 50 });
@@ -541,6 +624,7 @@ describe("ToolManager", () => {
       const hint = mgr.getHelpHint();
       expect(hint).toContain("nudge");
       expect(hint).toContain("Tab");
+      expect(hint).toContain("Del");
       expect(hint).toContain("Esc");
     });
   });

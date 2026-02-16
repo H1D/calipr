@@ -3,6 +3,7 @@ import type { Tool, ToolContext, ToolActions, ToolDrawState } from "./tool";
 import { dist, pointNear, screenToWorld } from "./utils";
 import { POINT_HIT_RADIUS, CLOSE_SNAP_RADIUS } from "./polyline-arc";
 import { saveMeasurements } from "./storage";
+import { getHintHTML } from "./keybind-registry";
 
 const DRAG_THRESHOLD = 3;
 
@@ -247,8 +248,22 @@ export class ToolManager {
   }
 
   handleDblClick(): void {
-    // Double-click on a completed polyline point to remove it
-    // Skip if the mousedown was consumed by selection/drag (prevents accidental deletion)
+    // Double-click on a selected polyline point → remove that point
+    if (this.selectedMeasurementId !== null && this.selectedPointIdx !== null) {
+      const mIdx = this.measurements.findIndex((m) => m.id === this.selectedMeasurementId);
+      const m = mIdx >= 0 ? this.measurements[mIdx]! : null;
+      if (m && m.kind === "polyline") {
+        removePolylinePoint(m, this.selectedPointIdx!);
+        if (m.segments.length === 0) {
+          this.measurements.splice(mIdx, 1);
+        }
+        this.persistMeasurements();
+        this.clearSelection();
+        return;
+      }
+    }
+
+    // Double-click on an unselected polyline point → remove it
     if (!this.lastMouseDownWasHit && !this._activeTool.hasActiveMeasurement()) {
       const hit = findHoveredPoint(this.measurements, this.mousePos);
       if (hit) {
@@ -309,9 +324,18 @@ export class ToolManager {
         this.clearSelection();
         return {};
       }
-      // Delete selected measurement
+      // Delete: polyline → remove selected point; others → delete entire measurement
       if (key === "Delete" || key === "Backspace") {
-        this.measurements = this.measurements.filter((m) => m.id !== this.selectedMeasurementId);
+        const mIdx = this.measurements.findIndex((m) => m.id === this.selectedMeasurementId);
+        const m = mIdx >= 0 ? this.measurements[mIdx]! : null;
+        if (m && m.kind === "polyline") {
+          removePolylinePoint(m, this.selectedPointIdx!);
+          if (m.segments.length === 0) {
+            this.measurements.splice(mIdx, 1);
+          }
+        } else {
+          this.measurements = this.measurements.filter((m) => m.id !== this.selectedMeasurementId);
+        }
         this.persistMeasurements();
         this.clearSelection();
         return {};
@@ -349,17 +373,25 @@ export class ToolManager {
   }
 
   getHelpHint(): string {
-    // Selection hint overrides tool base hint
     if (this.selectedMeasurementId !== null) {
-      return "<kbd>←→↑↓</kbd> nudge 0.5px · <kbd>Tab</kbd> next point · <kbd>Esc</kbd> deselect";
+      return getHintHTML(["selection"]);
     }
-    const base = this._activeTool.getHelpHint(this.getContext());
+
+    const ctx = this.getContext();
+    const instruction = this._activeTool.getHelpHint(ctx);
+    const keyCtx = this._activeTool.getActiveKeyContext(ctx);
+    const keyHints = keyCtx ? getHintHTML([keyCtx]) : "";
+
+    let hint = instruction;
+    if (keyHints) {
+      hint = hint ? hint + " · " + keyHints : keyHints;
+    }
+
     const drawState = this.getDrawState();
-    // Cross-cutting snap hint
     if ((drawState.snapGuide || drawState.closeSnapRing) && !this.shiftHeld) {
-      return base + " · hold <kbd>Shift</kbd> to ignore snap";
+      hint += " · " + getHintHTML(["snap"]);
     }
-    return base;
+    return hint;
   }
 
   // --- Clear all ---

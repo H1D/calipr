@@ -68,6 +68,10 @@ export class RectangleTool implements Tool {
     return !this.activeMeasurement ? "Click first corner" : "Click opposite corner";
   }
 
+  getActiveKeyContext(_ctx: ToolContext): string | null {
+    return this.activeMeasurement ? "rect.drawing" : null;
+  }
+
   hasActiveMeasurement(): boolean {
     return this.activeMeasurement !== null;
   }

@@ -1,6 +1,6 @@
 # Architectural Decision Records
 
-decisions[10]{id,title,context,choice,alternatives,date}:
+decisions[13]{id,title,context,choice,alternatives,date}:
   1,Declarative ToolActions,Tools communicate results to manager,Return ToolActions objects; manager interprets,Direct state mutation; event emitter,2026-02-12
   2,World coords with pan offset,Canvas needs scrolling,screenToWorld/worldToScreen with pan vector,CSS transform; virtual viewport,2026-02-12
   3,localStorage persistence,Session persistence without backend,localStorage with JSON serialization,IndexedDB; cookies,2026-02-12
@@ -11,3 +11,6 @@ decisions[10]{id,title,context,choice,alternatives,date}:
   8,Deferred drag for selection,Need click-to-select without triggering drag,3px threshold: mouseDown sets dragPending; mouseMove promotes to isDragging after threshold; mouseUp without threshold = select,Immediate drag with separate select tool; double-click to select,2026-02-13
   9,Selection as cross-tool concern,Point selection/nudge needed across all tool types,State on ToolManager (like drag/hover); not a new Tool,Separate SelectTool; per-tool selection logic,2026-02-13
   10,URL hash sharing with gzip,Share measurements without backend,Compact JSON→gzip→base64url in URL hash; CompressionStream API,Server-side short URLs; clipboard-only JSON; query params,2026-02-13
+  11,Keybinding registry with forced labels,Keybindings scattered across tools and manager; easy to add key without visible hint,Centralized CONTEXTS map with priority-sorted bindings; tools declare getActiveKeyContext(); getHintHTML() composes hints,Per-tool hint strings; inline kbd tags in each getHelpHint(),2026-02-16
+  12,Per-point polyline deletion,Del on selected point deleted entire measurement (surprising),Polyline: removePolylinePoint() on selected point; non-polyline: delete entire measurement; dblclick also removes selected polyline point,Always delete entire measurement; confirmation dialog,2026-02-16
+  13,Angle label suppression at arc junctions,Angles at line-arc junctions are meaningless (tangent-constrained),hasAdjacentArc flag on VertexAngle set by polylineVertexAngles(); renderer skips when true,Degree threshold filter (< 170°); filter in polylineVertexAngles() by omission,2026-02-16

@@ -275,15 +275,15 @@ export class LineTool implements Tool {
     if (this.isHoldingForArc) {
       return "Drag to shape the arc · release to set";
     }
-    if (this.activeMeasurement.segments.length === 0) {
-      return "Click next point · hold & drag for arc";
-    }
     const parts = ["Click next point · hold & drag for arc"];
     if (this.activeMeasurement.segments.length >= 2) {
       parts.push("click first point to close");
     }
-    parts.push("<kbd>Enter</kbd> to finish");
     return parts.join(" · ");
+  }
+
+  getActiveKeyContext(_ctx: ToolContext): string | null {
+    return this.activeMeasurement ? "line.drawing" : null;
   }
 
   hasActiveMeasurement(): boolean {
