@@ -548,6 +548,28 @@ describe("polylineVertexAngles", () => {
     }
   });
 
+  test("angle between straight and arc uses tangent, not chord", () => {
+    // Straight horizontal segment → arc curving up
+    // The arc tangent at its start should be horizontal (tangent-continuous),
+    // so the angle at the junction should be 180° (smooth transition), not the
+    // chord angle which would be less.
+    const bulge = computeTangentArcBulge({ x: 100, y: 0 }, { x: 200, y: -50 }, { x: 1, y: 0 });
+    expect(bulge).not.toBeNull();
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "arc-angle",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },                      // straight horizontal
+        { end: { x: 200, y: -50 }, bulge: bulge! },      // tangent arc
+      ],
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles).toHaveLength(1);
+    // With tangent-based angle: should be ~180° (smooth tangent-continuous junction)
+    // With chord-based angle: would be ~arctan(50/100) ≈ 153° (wrong)
+    expect(angles[0]!.degrees).toBeGreaterThan(170);
+  });
+
   test("closed square has 4 right angles", () => {
     const m: PolylineMeasurement = {
       kind: "polyline", id: "p1",

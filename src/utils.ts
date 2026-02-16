@@ -1,4 +1,4 @@
-import type { Point, Calibration, Unit, PolylineMeasurement } from "./types";
+import type { Point, Calibration, Unit, PolylineMeasurement, PolylineSegment } from "./types";
 import { DEFAULT_PX_PER_MM } from "./types";
 
 export function dist(a: Point, b: Point): number {
@@ -215,6 +215,29 @@ export function computeTangentArcBulge(segStart: Point, segEnd: Point, tangentDi
   };
 }
 
+/** Unit tangent direction of a circular arc at start or end. Returns null if degenerate. */
+export function arcTangent(start: Point, bulge: Point, end: Point, atStart: boolean): Point | null {
+  const circle = circumscribedCircle(start, bulge, end);
+  if (!circle) return null;
+
+  const p = atStart ? start : end;
+  const rx = p.x - circle.cx;
+  const ry = p.y - circle.cy;
+
+  const a1 = Math.atan2(start.y - circle.cy, start.x - circle.cx);
+  const a2 = Math.atan2(bulge.y - circle.cy, bulge.x - circle.cx);
+  const a3 = Math.atan2(end.y - circle.cy, end.x - circle.cx);
+  const sweep = angleSweepThrough(a1, a2, a3);
+
+  let dx: number, dy: number;
+  if (sweep >= 0) { dx = -ry; dy = rx; } // CCW
+  else { dx = ry; dy = -rx; } // CW
+
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 0.001) return null;
+  return { x: dx / len, y: dy / len };
+}
+
 /** Angle (in degrees) at vertex between vectors vertex→a and vertex→b. Returns 0 if points coincide. */
 export function vertexAngleDeg(a: Point, vertex: Point, b: Point): number {
   const vax = a.x - vertex.x;
@@ -237,7 +260,26 @@ export interface VertexAngle {
   degrees: number;
 }
 
-/** Compute the angle at every junction vertex of a polyline. For closed polylines, includes the start vertex. */
+/** Reference point for the incoming direction at vertex (segment ends at vertex). */
+function incomingRef(segStart: Point, seg: PolylineSegment, vertex: Point): Point {
+  if (seg.bulge) {
+    const t = arcTangent(segStart, seg.bulge, seg.end, false);
+    if (t) return { x: vertex.x - t.x, y: vertex.y - t.y };
+  }
+  return segStart;
+}
+
+/** Reference point for the outgoing direction at vertex (segment starts at vertex). */
+function outgoingRef(vertex: Point, seg: PolylineSegment): Point {
+  if (seg.bulge) {
+    const t = arcTangent(vertex, seg.bulge, seg.end, true);
+    if (t) return { x: vertex.x + t.x, y: vertex.y + t.y };
+  }
+  return seg.end;
+}
+
+/** Compute the angle at every junction vertex of a polyline. For closed polylines, includes the start vertex.
+ *  For arc segments, uses the arc tangent at the vertex (not the chord direction). */
 export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
   const segs = m.segments;
   if (segs.length < 2) return [];
@@ -245,12 +287,12 @@ export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
   const angles: VertexAngle[] = [];
 
   // Interior vertices (where segment i meets segment i+1)
-  let prev = m.start;
   for (let i = 0; i < segs.length - 1; i++) {
     const vertex = segs[i]!.end;
-    const next = segs[i + 1]!.end;
+    const segStart = i > 0 ? segs[i - 1]!.end : m.start;
+    const prev = incomingRef(segStart, segs[i]!, vertex);
+    const next = outgoingRef(vertex, segs[i + 1]!);
     angles.push({ vertex, prev, next, degrees: vertexAngleDeg(prev, vertex, next) });
-    prev = vertex;
   }
 
   // Closed polyline: additional angles for closing loop
@@ -259,24 +301,29 @@ export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
     const hasExplicitClose = lastEnd.x === m.start.x && lastEnd.y === m.start.y;
 
     if (!hasExplicitClose) {
-      // Closing segment was popped: angle at last vertex (→ implicit close back to start)
+      // Closing segment was popped: angle at last vertex (→ implicit straight close to start)
+      const prevSegStart = segs.length >= 2 ? segs[segs.length - 2]!.end : m.start;
+      const prev = incomingRef(prevSegStart, segs[segs.length - 1]!, lastEnd);
       angles.push({
         vertex: lastEnd,
         prev,
-        next: m.start,
+        next: m.start, // implicit straight close → chord direction is fine
         degrees: vertexAngleDeg(prev, lastEnd, m.start),
       });
     }
 
     // Angle at start vertex
-    const prevToStart = hasExplicitClose ? segs[segs.length - 2]!.end : lastEnd;
-    const nextFromStart = segs[0]!.end;
-    angles.push({
-      vertex: m.start,
-      prev: prevToStart,
-      next: nextFromStart,
-      degrees: vertexAngleDeg(prevToStart, m.start, nextFromStart),
-    });
+    if (hasExplicitClose) {
+      // Explicit closing segment: incoming = closing seg, outgoing = seg[0]
+      const closeStart = segs.length >= 2 ? segs[segs.length - 2]!.end : m.start;
+      const prev = incomingRef(closeStart, segs[segs.length - 1]!, m.start);
+      const next = outgoingRef(m.start, segs[0]!);
+      angles.push({ vertex: m.start, prev, next, degrees: vertexAngleDeg(prev, m.start, next) });
+    } else {
+      // Popped closing: incoming = implicit straight from lastEnd, outgoing = seg[0]
+      const next = outgoingRef(m.start, segs[0]!);
+      angles.push({ vertex: m.start, prev: lastEnd, next, degrees: vertexAngleDeg(lastEnd, m.start, next) });
+    }
   }
 
   return angles;
