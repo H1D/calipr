@@ -253,10 +253,23 @@ export function polylineVertexAngles(m: PolylineMeasurement): VertexAngle[] {
     prev = vertex;
   }
 
-  // Closed polyline: angle at start (between closing segment and first segment)
+  // Closed polyline: additional angles for closing loop
   if (m.closed && segs.length >= 2) {
-    // Previous point to start is the second-to-last segment's end
-    const prevToStart = segs[segs.length - 2]!.end;
+    const lastEnd = segs[segs.length - 1]!.end;
+    const hasExplicitClose = lastEnd.x === m.start.x && lastEnd.y === m.start.y;
+
+    if (!hasExplicitClose) {
+      // Closing segment was popped: angle at last vertex (→ implicit close back to start)
+      angles.push({
+        vertex: lastEnd,
+        prev,
+        next: m.start,
+        degrees: vertexAngleDeg(prev, lastEnd, m.start),
+      });
+    }
+
+    // Angle at start vertex
+    const prevToStart = hasExplicitClose ? segs[segs.length - 2]!.end : lastEnd;
     const nextFromStart = segs[0]!.end;
     angles.push({
       vertex: m.start,

@@ -510,6 +510,44 @@ describe("polylineVertexAngles", () => {
     expect(sum).toBeCloseTo(180, 0);
   });
 
+  test("closed triangle WITHOUT closing segment (popped) has 3 correct angles", () => {
+    // Real data shape after LineTool closes without arc: closing segment popped
+    // Right triangle: (0,0) → (300,0) → (0,300) → back to start
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "diag",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 300, y: 0 } },
+        { end: { x: 0, y: 300 } },
+        // NO closing segment — it was popped
+      ],
+      closed: true,
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles).toHaveLength(3);
+    const sum = angles.reduce((s, a) => s + a.degrees, 0);
+    expect(sum).toBeCloseTo(180, 0);
+  });
+
+  test("closed square WITHOUT closing segment (popped) has 4 right angles", () => {
+    const m: PolylineMeasurement = {
+      kind: "polyline", id: "diag2",
+      start: { x: 0, y: 0 },
+      segments: [
+        { end: { x: 100, y: 0 } },
+        { end: { x: 100, y: 100 } },
+        { end: { x: 0, y: 100 } },
+        // NO closing segment — it was popped
+      ],
+      closed: true,
+    };
+    const angles = polylineVertexAngles(m);
+    expect(angles).toHaveLength(4);
+    for (const a of angles) {
+      expect(a.degrees).toBeCloseTo(90, 1);
+    }
+  });
+
   test("closed square has 4 right angles", () => {
     const m: PolylineMeasurement = {
       kind: "polyline", id: "p1",
