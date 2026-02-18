@@ -367,6 +367,13 @@ export class ToolManager {
     return actions;
   }
 
+  /** Whether the calibrate button should flash — only when uncalibrated AND something is on the canvas */
+  shouldFlashCalibrate(): boolean {
+    if (this.calibration !== null) return false;
+    if (this.activeToolName === "calibrate") return false;
+    return this.measurements.length > 0 || this._activeTool.hasActiveMeasurement();
+  }
+
   // --- Draw state ---
   getDrawState(): ToolDrawState {
     return this._activeTool.getDrawState(this.getContext());

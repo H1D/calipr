@@ -629,6 +629,55 @@ describe("ToolManager", () => {
     });
   });
 
+  describe("shouldFlashCalibrate", () => {
+    test("false when canvas is empty (no measurements, no active)", () => {
+      const mgr = createManager();
+      expect(mgr.shouldFlashCalibrate()).toBe(false);
+    });
+
+    test("true when uncalibrated with completed measurements", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "r1",
+        points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+      });
+      expect(mgr.shouldFlashCalibrate()).toBe(true);
+    });
+
+    test("false when calibrated", () => {
+      const mgr = createManager();
+      mgr.calibration = { pxPerMmX: 5, pxPerMmY: 5 };
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "r1",
+        points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+      });
+      expect(mgr.shouldFlashCalibrate()).toBe(false);
+    });
+
+    test("false when calibrate tool is active", () => {
+      const mgr = createManager();
+      mgr.measurements.push({
+        kind: "rectangle",
+        id: "r1",
+        points: [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+      });
+      mgr.setActiveTool("calibrate");
+      expect(mgr.shouldFlashCalibrate()).toBe(false);
+    });
+
+    test("true when uncalibrated with active measurement being drawn", () => {
+      const mgr = createManager();
+      // Start drawing a polyline (no completed measurements yet)
+      mgr.handleMouseDown({ x: 0, y: 0 });
+      mgr.handleMouseDown({ x: 100, y: 0 });
+      expect(mgr.measurements).toHaveLength(0); // not yet completed
+      expect(mgr.activeTool.hasActiveMeasurement()).toBe(true);
+      expect(mgr.shouldFlashCalibrate()).toBe(true);
+    });
+  });
+
   describe("saveVersion", () => {
     test("increments on measurement completion", () => {
       const mgr = createManager();

@@ -239,7 +239,7 @@ function updateUnitUI() {
 function updateCalibrateButtonFlash() {
   const btn = toolbar.querySelector('.tool-btn[data-tool="calibrate"]') as HTMLElement | null;
   if (!btn) return;
-  if (manager.calibration === null && manager.activeToolName !== "calibrate") {
+  if (manager.shouldFlashCalibrate()) {
     btn.classList.add("flash-calibrate");
   } else {
     btn.classList.remove("flash-calibrate");
