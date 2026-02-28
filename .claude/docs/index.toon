@@ -1,0 +1,18 @@
+project: ruler2
+type: typescript/canvas
+framework: none (vanilla)
+updated: 2026-02-28
+
+features[6]{name,path,status,layer}:
+  measurement-tools,.claude/docs/features/measurement-tools.md,stable,frontend
+  polyline-arcs,.claude/docs/features/polyline-arcs.md,stable,frontend
+  calibration,.claude/docs/features/calibration.md,stable,frontend
+  selection,.claude/docs/features/selection.md,stable,frontend
+  export-share,.claude/docs/features/export-share.md,stable,frontend
+  theming,.claude/docs/features/theming.md,stable,frontend
+
+docs[4]{type,path}:
+  overview,.claude/docs/overview.md
+  architecture,.claude/docs/architecture.md
+  decisions,.claude/docs/decisions.md
+  dependencies,.claude/docs/dependencies.md

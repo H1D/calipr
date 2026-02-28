@@ -1,0 +1,18 @@
+project: ruler2
+type: typescript/canvas
+framework: none (vanilla)
+updated: 2026-02-28
+
+features[6]{name,path,status,layer}:
+  measurement-tools,.ai/docs/features/measurement-tools.md,stable,frontend
+  polyline-arcs,.ai/docs/features/polyline-arcs.md,stable,frontend
+  calibration,.ai/docs/features/calibration.md,stable,frontend
+  selection,.ai/docs/features/selection.md,stable,frontend
+  export-share,.ai/docs/features/export-share.md,stable,frontend
+  theming,.ai/docs/features/theming.md,stable,frontend
+
+docs[4]{type,path}:
+  overview,.ai/docs/overview.md
+  architecture,.ai/docs/architecture.md
+  decisions,.ai/docs/decisions.md
+  dependencies,.ai/docs/dependencies.md
