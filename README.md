@@ -4,6 +4,8 @@ A browser-based measurement tool for taking real-world dimensions off your scree
 
 ![Ruler screenshot](docs/screenshot.png)
 
+[![Watch the demo](https://img.youtube.com/vi/MQ1rqQ_Xyok/maxresdefault.jpg)](https://youtu.be/MQ1rqQ_Xyok)
+
 ## Why
 
 Measuring physical objects through a screen (photos, scans, video frames) normally means switching between apps or eyeballing pixel counts. Ruler gives you CAD-style drawing tools directly in the browser with sub-millimeter accuracy after a one-time calibration.
