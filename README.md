@@ -51,3 +51,4 @@ npx vite build     # production build → dist/
 ## Tech
 
 TypeScript, Canvas 2D, Vite. No frameworks. Bun as runtime and test runner.
+
