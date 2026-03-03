@@ -1,10 +1,27 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
 import { ToolManager, getMeasurementPoints, setMeasurementPoint, findHoveredPoint, removePolylinePoint } from "./tool-manager";
 import { LineTool } from "./tools/line-tool";
 import { RectangleTool } from "./tools/rectangle-tool";
 import { CircleTool } from "./tools/circle-tool";
 import { CalibrateTool } from "./tools/calibrate-tool";
 import type { Measurement, PolylineMeasurement, RectangleMeasurement, CircleMeasurement } from "./types";
+
+// Mock localStorage for Bun test environment
+const store: Record<string, string> = {};
+// @ts-ignore -- mocking localStorage in test env
+globalThis.localStorage = {
+  getItem: (key: string) => store[key] ?? null,
+  setItem: (key: string, value: string) => { store[key] = value; },
+  removeItem: (key: string) => { delete store[key]; },
+  clear: () => { for (const k of Object.keys(store)) delete store[k]; },
+  get length() { return Object.keys(store).length; },
+  key: (i: number) => Object.keys(store)[i] ?? null,
+};
+
+beforeEach(() => {
+  // @ts-ignore
+  globalThis.localStorage.clear();
+});
 
 function createManager() {
   const mgr = new ToolManager([], null, "mm", 0, 0);
@@ -675,6 +692,28 @@ describe("ToolManager", () => {
       expect(mgr.measurements).toHaveLength(0); // not yet completed
       expect(mgr.activeTool.hasActiveMeasurement()).toBe(true);
       expect(mgr.shouldFlashCalibrate()).toBe(true);
+    });
+
+    test("true when screen changed even if calibration exists", () => {
+      const mgr = createManager();
+      mgr.calibration = { pxPerMmX: 5, pxPerMmY: 5 };
+      mgr.screenChanged = true;
+      expect(mgr.shouldFlashCalibrate()).toBe(true);
+    });
+
+    test("false when screen changed but calibrate tool is active", () => {
+      const mgr = createManager();
+      mgr.calibration = { pxPerMmX: 5, pxPerMmY: 5 };
+      mgr.screenChanged = true;
+      mgr.setActiveTool("calibrate");
+      expect(mgr.shouldFlashCalibrate()).toBe(false);
+    });
+
+    test("setCalibration clears screenChanged flag", () => {
+      const mgr = createManager();
+      mgr.screenChanged = true;
+      mgr.processActions({ setCalibration: { pxPerMmX: 5, pxPerMmY: 5 } });
+      expect(mgr.screenChanged).toBe(false);
     });
   });
 

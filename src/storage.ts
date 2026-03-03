@@ -1,8 +1,10 @@
 import type { Calibration, Measurement } from "./types";
+import type { ScreenFingerprint } from "./screen-monitor";
 
 const CALIBRATION_KEY = "ruler2_calibration";
 const MEASUREMENTS_KEY = "ruler2_measurements";
 const PAN_KEY = "ruler2_pan";
+const SCREEN_FINGERPRINT_KEY = "ruler2_screen_fingerprint";
 
 export function saveCalibration(cal: Calibration): void {
   localStorage.setItem(CALIBRATION_KEY, JSON.stringify(cal));
@@ -52,6 +54,22 @@ export function loadPan(): { x: number; y: number } | null {
     const parsed = JSON.parse(raw);
     if (typeof parsed.x === "number" && typeof parsed.y === "number") {
       return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+export function saveScreenFingerprint(fp: ScreenFingerprint): void {
+  localStorage.setItem(SCREEN_FINGERPRINT_KEY, JSON.stringify(fp));
+}
+
+export function loadScreenFingerprint(): ScreenFingerprint | null {
+  const raw = localStorage.getItem(SCREEN_FINGERPRINT_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.dpr === "number" && typeof parsed.screenWidth === "number" && typeof parsed.screenHeight === "number") {
+      return parsed as ScreenFingerprint;
     }
   } catch {}
   return null;

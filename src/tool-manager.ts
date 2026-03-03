@@ -112,6 +112,7 @@ export class ToolManager {
     }
     if (actions.setCalibration) {
       this.calibration = actions.setCalibration;
+      this.screenChanged = false;
     }
     if (actions.switchTool) {
       this.setActiveTool(actions.switchTool);
@@ -367,10 +368,13 @@ export class ToolManager {
     return actions;
   }
 
-  /** Whether the calibrate button should flash — only when uncalibrated AND something is on the canvas */
+  /** Whether the calibrate button should flash — uncalibrated with content, or stale calibration */
+  screenChanged = false;
+
   shouldFlashCalibrate(): boolean {
-    if (this.calibration !== null) return false;
     if (this.activeToolName === "calibrate") return false;
+    if (this.screenChanged) return true;
+    if (this.calibration !== null) return false;
     return this.measurements.length > 0 || this._activeTool.hasActiveMeasurement();
   }
 
