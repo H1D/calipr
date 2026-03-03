@@ -676,6 +676,28 @@ describe("ToolManager", () => {
       expect(mgr.activeTool.hasActiveMeasurement()).toBe(true);
       expect(mgr.shouldFlashCalibrate()).toBe(true);
     });
+
+    test("true when screen changed even if calibration exists", () => {
+      const mgr = createManager();
+      mgr.calibration = { pxPerMmX: 5, pxPerMmY: 5 };
+      mgr.screenChanged = true;
+      expect(mgr.shouldFlashCalibrate()).toBe(true);
+    });
+
+    test("false when screen changed but calibrate tool is active", () => {
+      const mgr = createManager();
+      mgr.calibration = { pxPerMmX: 5, pxPerMmY: 5 };
+      mgr.screenChanged = true;
+      mgr.setActiveTool("calibrate");
+      expect(mgr.shouldFlashCalibrate()).toBe(false);
+    });
+
+    test("setCalibration clears screenChanged flag", () => {
+      const mgr = createManager();
+      mgr.screenChanged = true;
+      mgr.processActions({ setCalibration: { pxPerMmX: 5, pxPerMmY: 5 } });
+      expect(mgr.screenChanged).toBe(false);
+    });
   });
 
   describe("saveVersion", () => {

@@ -1,7 +1,7 @@
 import type { ToolType, Unit } from "./types";
 import { detectDefaultUnit } from "./utils";
 import { Renderer } from "./renderer";
-import { loadCalibration, loadMeasurements, clearStorage, savePan, loadPan, saveMeasurements } from "./storage";
+import { loadCalibration, loadMeasurements, clearStorage, savePan, loadPan, saveMeasurements, saveScreenFingerprint, loadScreenFingerprint } from "./storage";
 import { PRESETS, loadPresetIndex, savePresetIndex, getShortcutLabel, toolForKey } from "./keybindings";
 import { exportSVG, downloadSVG } from "./export-svg";
 import { loadFromHash, setHash } from "./share";
@@ -10,6 +10,7 @@ import { CalibrateTool } from "./tools/calibrate-tool";
 import { RectangleTool } from "./tools/rectangle-tool";
 import { CircleTool } from "./tools/circle-tool";
 import { LineTool } from "./tools/line-tool";
+import { captureFingerprint, fingerprintChanged, watchScreenChanges } from "./screen-monitor";
 
 // --- Initialize State ---
 const initialCal = loadCalibration();
@@ -109,6 +110,28 @@ let hashUpdateInFlight = false;
     lastSyncedVersion = manager.saveVersion;
   }
 })();
+
+// --- Screen change detection ---
+function checkScreenChange() {
+  if (!manager.calibration) return;
+  const saved = loadScreenFingerprint();
+  if (!saved) return;
+  const current = captureFingerprint();
+  if (fingerprintChanged(saved, current)) {
+    manager.screenChanged = true;
+    showToast("Display changed — consider recalibrating", 5000);
+    updateCalibrateButtonFlash();
+  }
+}
+
+// Check on startup
+checkScreenChange();
+
+// Watch for live screen changes (DPR change, external monitor swap)
+watchScreenChanges(() => {
+  renderer.resize();
+  checkScreenChange();
+});
 
 // --- Initialize ---
 applyTheme();
@@ -241,8 +264,9 @@ function updateCalibrateButtonFlash() {
   if (!btn) return;
   if (manager.shouldFlashCalibrate()) {
     btn.classList.add("flash-calibrate");
+    btn.classList.toggle("screen-changed", manager.screenChanged);
   } else {
-    btn.classList.remove("flash-calibrate");
+    btn.classList.remove("flash-calibrate", "screen-changed");
   }
 }
 

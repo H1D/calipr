@@ -1,7 +1,8 @@
 import type { Point, Calibration } from "../types";
 import { CREDIT_CARD_WIDTH_MM, CREDIT_CARD_HEIGHT_MM, DEFAULT_PX_PER_MM } from "../types";
 import type { Tool, ToolContext, ToolActions, ToolDrawState } from "../tool";
-import { saveCalibration } from "../storage";
+import { saveCalibration, saveScreenFingerprint } from "../storage";
+import { captureFingerprint } from "../screen-monitor";
 
 export class CalibrateTool implements Tool {
   readonly name = "calibrate" as const;
@@ -47,6 +48,7 @@ export class CalibrateTool implements Tool {
           pxPerMmY: this.calHeightPx / CREDIT_CARD_HEIGHT_MM,
         };
         saveCalibration(cal);
+        saveScreenFingerprint(captureFingerprint());
         return { setCalibration: cal, switchTool: "line" };
       }
       case "Escape":
@@ -124,6 +126,7 @@ export class CalibrateTool implements Tool {
           pxPerMmY: this.calHeightPx / CREDIT_CARD_HEIGHT_MM,
         };
         saveCalibration(cal);
+        saveScreenFingerprint(captureFingerprint());
         return { setCalibration: cal, switchTool: "line" };
       }
       case "cancel":

@@ -7,8 +7,11 @@ import {
   clearStorage,
   savePan,
   loadPan,
+  saveScreenFingerprint,
+  loadScreenFingerprint,
 } from "./storage";
 import type { Calibration, Measurement } from "./types";
+import type { ScreenFingerprint } from "./screen-monitor";
 
 // Mock localStorage for Bun test environment
 const store: Record<string, string> = {};
@@ -100,6 +103,29 @@ describe("measurements storage", () => {
     expect(loadMeasurements().length).toBe(1);
     clearStorage();
     expect(loadMeasurements()).toEqual([]);
+  });
+});
+
+describe("screen fingerprint storage", () => {
+  test("returns null when no fingerprint stored", () => {
+    expect(loadScreenFingerprint()).toBeNull();
+  });
+
+  test("saves and loads fingerprint", () => {
+    const fp: ScreenFingerprint = { dpr: 2, screenWidth: 1920, screenHeight: 1080 };
+    saveScreenFingerprint(fp);
+    const loaded = loadScreenFingerprint();
+    expect(loaded).toEqual(fp);
+  });
+
+  test("handles corrupt data gracefully", () => {
+    store["ruler2_screen_fingerprint"] = "not json";
+    expect(loadScreenFingerprint()).toBeNull();
+  });
+
+  test("handles invalid shape gracefully", () => {
+    store["ruler2_screen_fingerprint"] = JSON.stringify({ foo: "bar" });
+    expect(loadScreenFingerprint()).toBeNull();
   });
 });
 
