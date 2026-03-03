@@ -1,10 +1,27 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
 import { ToolManager, getMeasurementPoints, setMeasurementPoint, findHoveredPoint, removePolylinePoint } from "./tool-manager";
 import { LineTool } from "./tools/line-tool";
 import { RectangleTool } from "./tools/rectangle-tool";
 import { CircleTool } from "./tools/circle-tool";
 import { CalibrateTool } from "./tools/calibrate-tool";
 import type { Measurement, PolylineMeasurement, RectangleMeasurement, CircleMeasurement } from "./types";
+
+// Mock localStorage for Bun test environment
+const store: Record<string, string> = {};
+// @ts-ignore -- mocking localStorage in test env
+globalThis.localStorage = {
+  getItem: (key: string) => store[key] ?? null,
+  setItem: (key: string, value: string) => { store[key] = value; },
+  removeItem: (key: string) => { delete store[key]; },
+  clear: () => { for (const k of Object.keys(store)) delete store[k]; },
+  get length() { return Object.keys(store).length; },
+  key: (i: number) => Object.keys(store)[i] ?? null,
+};
+
+beforeEach(() => {
+  // @ts-ignore
+  globalThis.localStorage.clear();
+});
 
 function createManager() {
   const mgr = new ToolManager([], null, "mm", 0, 0);
