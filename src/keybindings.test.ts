@@ -1,6 +1,18 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { PRESETS, loadPresetIndex, savePresetIndex, getShortcutLabel, toolForKey } from "./keybindings";
 
+const store: Record<string, string> = {};
+
+// @ts-ignore -- mocking localStorage in test env
+globalThis.localStorage = {
+  getItem: (key: string) => store[key] ?? null,
+  setItem: (key: string, value: string) => { store[key] = value; },
+  removeItem: (key: string) => { delete store[key]; },
+  clear: () => { for (const key of Object.keys(store)) delete store[key]; },
+  get length() { return Object.keys(store).length; },
+  key: (index: number) => Object.keys(store)[index] ?? null,
+};
+
 beforeEach(() => {
   localStorage.clear();
 });
