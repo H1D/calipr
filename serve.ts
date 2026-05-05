@@ -6,7 +6,11 @@ Bun.serve({
 
     if (path === "/") path = "/index.html";
 
-    const file = Bun.file("." + path);
+    let file = Bun.file("." + path);
+    if (!(await file.exists())) {
+      file = Bun.file("./public" + path);
+    }
+
     if (await file.exists()) {
       // Set correct content types for TS files served to browser
       if (path.endsWith(".ts")) {

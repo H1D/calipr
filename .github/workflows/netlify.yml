@@ -24,7 +24,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: production
         run: |
-          OUTPUT=$(npx netlify-cli deploy --dir=dist --prod --json)
+          OUTPUT=$(bunx netlify-cli deploy --dir=dist --prod --json)
           DEPLOY_URL=$(echo "$OUTPUT" | jq -r '.deploy_url')
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
         env:
@@ -59,7 +59,7 @@ jobs:
         if: github.event_name == 'pull_request'
         id: preview
         run: |
-          OUTPUT=$(npx netlify-cli deploy --dir=dist --json)
+          OUTPUT=$(bunx netlify-cli deploy --dir=dist --json)
           DEPLOY_URL=$(echo "$OUTPUT" | jq -r '.deploy_url')
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
         env:
